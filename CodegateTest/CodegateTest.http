@@ -1,0 +1,6 @@
+@CodegateTest_HostAddress = http://localhost:5169
+
+GET {{CodegateTest_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
