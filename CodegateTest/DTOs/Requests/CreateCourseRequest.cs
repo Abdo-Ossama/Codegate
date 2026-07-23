@@ -1,28 +1,31 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
-namespace CodegateTest.Models
+namespace CodegateTest.DTOs.Requests
 {
-    public class Course
+    public class CreateCourseRequest
     {
-        public int Id { get; set; }
         [Required(ErrorMessage = "Course name is required.")]
-        [StringLength(100, MinimumLength = 3,
-            ErrorMessage = "Course name must be between 3 and 100 characters.")]
+        [StringLength(100, MinimumLength = 3)]
         public string Name { get; set; } = null!;
+
         [Required(ErrorMessage = "Slug is required.")]
         [StringLength(150)]
         [RegularExpression(@"^[a-z0-9-]+$",
             ErrorMessage = "Slug can only contain lowercase letters, numbers, and hyphens.")]
         public string Slug { get; set; } = null!;
+
         [Required(ErrorMessage = "Price is required.")]
+        [Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than 0.")]
         public decimal Price { get; set; }
+
         public string? Description { get; set; }
-        public bool IsActive { get; set; } = true;
-        public bool IsDeleted { get; set; } = false;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
         [Required(ErrorMessage = "Cover Image is required.")]
-        public string CoverImageUrl { get; set; } = null!;
-        public ICollection<CourseInstructors> CourseInstructors { get; set; }
-            = new List<CourseInstructors>();
+        public IFormFile CoverImage { get; set; } = null!;
+
+        [Required(ErrorMessage = "At least one instructor is required.")]
+        [MinLength(1, ErrorMessage = "At least one instructor is required.")]
+        public List<int> InstructorIds { get; set; } = new();
     }
 }

@@ -99,6 +99,7 @@ builder.Services.AddScoped<IRepository<CourseInstructors>, Repository<CourseInst
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 
+
 builder.Services.AddScoped<DbIntializer>();
 
 

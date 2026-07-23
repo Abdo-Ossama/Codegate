@@ -1,4 +1,5 @@
 ﻿using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Services.IServices;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,16 +16,23 @@ namespace CodegateTest.Areas.Admin
         private readonly IRepository<Instructor> _instructorRepository;
         private readonly IRepository<CourseInstructors> _courseInstractorRepository;
 
-        public CoursesController(IRepository<Course> courseRepository ,
-            IRepository<CourseInstructors> courseInstractorRepository)
+
+
+        public CoursesController(IRepository<Course> courseRepository,
+            IRepository<CourseInstructors> courseInstractorRepository,
+            IRepository<Instructor> instructorRepository) 
+        
         {
             _courseRepository = courseRepository;
             _courseInstractorRepository = courseInstractorRepository;
+            _instructorRepository = instructorRepository;
+
+            
         }
         [HttpGet("")]
         public async Task<IActionResult> GetAll(int page = 1 )
         {
-            var courses = await _courseRepository.GetAsync(
+            var courses = await _courseRepository.GetAsync(e=>!e.IsDeleted,
        includes: [e=>e.CourseInstructors , ]
            
    );
@@ -115,51 +123,195 @@ namespace CodegateTest.Areas.Admin
                 }
             });
         }
+
         [HttpPost]
-        public async Task<IActionResult> Create(IFormFile Img,
-            [FromForm] CourseCreateRequest courseCreateRequest)
+        public async Task<IActionResult> CreateCourse([FromForm] CreateCourseRequest createCourseRequest)
         {
-            if (Img is null || Img.Length == 0)
+    
+            var allowedExtensions = new[] { ".png", ".jpg", ".jpeg" };
+            var extension = Path.GetExtension(createCourseRequest.CoverImage.FileName)
+                .ToLowerInvariant();
+
+            if (!allowedExtensions.Contains(extension))
             {
                 return BadRequest(new APIResponce
                 {
                     StatusCode = 400,
-                    Message = ["Course image is required."]
+                    Message = ["Only PNG and JPG images are allowed"]
                 });
             }
 
-            var instructors = await _instructorRepository.GetAsync(
-                e => courseCreateRequest.InstructorIds.Contains(e.Id)
+            var newFile =
+                Guid.NewGuid().ToString()[..7] +
+                DateTime.UtcNow.ToString("yyyy-MM-dd") +
+                extension;
+
+            var filePath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                "img",
+                "courses_img",
+                newFile
             );
 
-            if (instructors.Count() != courseCreateRequest.InstructorIds.Count)
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+            using (var stream = System.IO.File.Create(filePath))
             {
-                return BadRequest(new APIResponce
-                {
-                    StatusCode = 400,
-                    Message = ["One or more instructors not found."]
-                });
+                await createCourseRequest.CoverImage.CopyToAsync(stream);
             }
 
-            var course = courseCreateRequest.Adapt<Course>();
-
-            // Add instructor to the course from the relation
-            foreach (var instructor in instructors)
+            var course = new Course
             {
-                course.CourseInstructors.Add(new CourseInstructors
-                {
-                    InstructorId = instructor.Id
-                });
-            }
+                Name = createCourseRequest.Name,
+                Slug = createCourseRequest.Slug,
+                Price = createCourseRequest.Price,
+                Description = createCourseRequest.Description,
+                CoverImageUrl = newFile,
+                CourseInstructors = createCourseRequest.InstructorIds
+                    .Select(id => new CourseInstructors { InstructorId = id })
+                    .ToList()
+            };
 
             await _courseRepository.CreateAsync(course);
-
             await _courseRepository.CommitAsync();
 
             return Ok(new APIResponce
             {
                 StatusCode = 200,
                 Message = ["Course Created Successfully"]
+            });
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(
+          int id,
+          [FromForm] CourseUpdateRequest courseUpdateRequest)
+        {
+            var courseInDb = await _courseRepository.GetOneAsync(
+                e => e.Id == id,
+                includes: [e => e.CourseInstructors]
+               
+            );
+
+            if (courseInDb is null)
+            {
+                return NotFound(new APIResponce
+                {
+                    StatusCode = 404,
+                    Message = ["Course Not Found"]
+                });
+            }
+
+            // Update Course Image
+            if (courseUpdateRequest.CoverImg is not null &&
+                courseUpdateRequest.CoverImg.Length > 0)
+            {
+            
+                var newFile =
+                    Guid.NewGuid().ToString().Substring(0, 7) +
+                    DateTime.UtcNow.ToString("yyyy-MM-dd") +
+                    Path.GetExtension(courseUpdateRequest.CoverImg.FileName);
+
+                var filePath = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot",
+                    "img",
+                    "courses_img",
+                    newFile
+                );
+
+                using (var stream = System.IO.File.Create(filePath))
+                {
+                    await courseUpdateRequest.CoverImg.CopyToAsync(stream);
+                }
+
+                // Delete old image
+                if (!string.IsNullOrEmpty(courseInDb.CoverImageUrl))
+                {
+                    var oldPhotoPath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "img",
+                        "courses_img",
+                        courseInDb.CoverImageUrl
+                    );
+
+                    if (System.IO.File.Exists(oldPhotoPath))
+                    {
+                        System.IO.File.Delete(oldPhotoPath);
+                    }
+                }
+
+                courseInDb.CoverImageUrl = newFile;
+            }
+
+            // Update Course Data
+            courseInDb.Name =
+                courseUpdateRequest.Name ?? courseInDb.Name;
+
+            courseInDb.Slug =
+                courseUpdateRequest.Slug ?? courseInDb.Slug;
+
+            courseInDb.Price =
+                courseUpdateRequest.Price ?? courseInDb.Price;
+
+            courseInDb.Description =
+                courseUpdateRequest.Description ?? courseInDb.Description;
+
+            courseInDb.IsActive =
+                courseUpdateRequest.IsActive ?? courseInDb.IsActive;
+
+
+            // Update Instructors
+            if (courseUpdateRequest.InstructorIds is not null)
+            {
+                courseInDb.CourseInstructors.Clear();
+
+                foreach (var instructorId in courseUpdateRequest.InstructorIds)
+                {
+                    courseInDb.CourseInstructors.Add(
+                        new CourseInstructors
+                        {
+                            CourseId = courseInDb.Id,
+                            InstructorId = instructorId
+                        }
+                    );
+                }
+            }
+
+            _courseRepository.Update(courseInDb);
+
+            await _courseRepository.CommitAsync();
+
+            return NoContent();
+        }
+
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var course = await _courseRepository.GetOneAsync(
+                e => e.Id == id
+            );
+
+            if (course is null)
+            {
+                return NotFound(new APIResponce
+                {
+                    StatusCode = 404,
+                    Message = ["Course Not Found"]
+                });
+            }
+
+            course.IsDeleted = true;
+
+            await _courseRepository.CommitAsync();
+
+            return Ok(new APIResponce
+            {
+                StatusCode = 200,
+                Message = ["Course Deleted Successfully"]
             });
         }
     }
