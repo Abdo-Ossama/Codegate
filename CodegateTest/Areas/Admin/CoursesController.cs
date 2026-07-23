@@ -52,17 +52,17 @@ namespace CodegateTest.Areas.Admin
 
             return Ok(new CoursesResponce()
             {
-                items = cousreQuery.Select(c => new
+                items = cousreQuery.Select(e => new
                 {
-                    c.Id,
-                    c.Name,
-                    c.Slug,
-                    c.Price,
-                    c.Description,
-                    c.IsActive,
-                    c.CoverImageUrl,
+                    e.Id,
+                    e.Name,
+                    e.Slug,
+                    e.Price,
+                    e.Description,
+                    e.IsActive,
+                    e.CoverImageUrl,
 
-                    Instructors = c.CourseInstructors
+                    Instructors = e.CourseInstructors
             .Select(e =>
                 $"{e.Instructor.FirstName} {e.Instructor.LastName}")
             .ToList()
