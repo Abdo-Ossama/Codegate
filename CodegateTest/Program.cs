@@ -96,6 +96,7 @@ builder.Services.AddScoped<IRepository<ApplicationUserOTP>, Repository<Applicati
 builder.Services.AddScoped<IRepository<Course>, Repository<Course>>();
 builder.Services.AddScoped<IRepository<Instructor>, Repository<Instructor>>();
 builder.Services.AddScoped<IRepository<CourseInstructors>, Repository<CourseInstructors>>();
+builder.Services.AddScoped<IRepository<Contact>, Repository<Contact>>();
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 

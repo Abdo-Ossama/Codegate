@@ -7,6 +7,8 @@ namespace CodegateTest.Models
         public string Fname { get; set; } = string.Empty;
         public string Lname { get; set; } = string.Empty;
         public string? Address { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
 
     }
 }
