@@ -46,6 +46,10 @@ namespace CodegateTest.Areas.Identity
         public async Task<IActionResult> Register(RegisterRequest registerRequest)
         {
             var user = registerRequest.Adapt<ApplicationUser>();
+            var seed = Uri.EscapeDataString($"{user.Fname}-{user.Lname}");
+
+            user.ProfileImageUrl =
+                $"https://api.dicebear.com/10.x/initials/svg?seed={seed}"; // add avatar 
             var result = await _userManager.CreateAsync(user, registerRequest.Password);
 
             if (!result.Succeeded)
@@ -78,7 +82,7 @@ namespace CodegateTest.Areas.Identity
             {
                 StatusCode = 201, // Create
                 Message = ["Your Register is Completed Successfully .."],
-
+          
             });
         }
 
@@ -120,12 +124,13 @@ namespace CodegateTest.Areas.Identity
 
             var roles = await _userManager.GetRolesAsync(user); // List of userRoles
 
-            await _jWTHandler.GenerateTokenAsync(user.Id, loginRequest.Email);
+          var token =   await _jWTHandler.GenerateTokenAsync(user.Id, loginRequest.Email);
 
             return Ok(new APIResponce()
             {
                 StatusCode = 200,
-                Message = [$"Welcome, {user.UserName}"]
+                Message = [$"Welcome, {user.UserName}"],
+                Data = token
             });
 
         }

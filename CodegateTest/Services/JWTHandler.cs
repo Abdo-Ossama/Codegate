@@ -28,10 +28,14 @@ public class JWTHandler : IJWTHandler
         List<Claim> claims = new List<Claim>();
 
         claims.Add(new(ClaimTypes.NameIdentifier, userId));
-        claims.Add(new(ClaimTypes.Email, email));
-        claims.Add(new(JwtRegisteredClaimNames.Iat, DateTime.Now.ToString("dd-MM-yyyy")));
+        claims.Add(new(ClaimTypes.Email, user.Email!));
+        claims.Add(new(ClaimTypes.Name, user.UserName!));
+            claims.Add(new(
+          JwtRegisteredClaimNames.Iat,
+          DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
+      ));
 
-        var userRoles = await _userManager.GetRolesAsync(user);
+            var userRoles = await _userManager.GetRolesAsync(user);
 
         foreach (var item in userRoles)
         {
@@ -45,7 +49,7 @@ public class JWTHandler : IJWTHandler
             issuer: _configuration["JWT:Issuer"],
             audience: _configuration["JWT:Audience"],
             claims: claims,
-            expires: DateTime.Now.AddMinutes(20),
+          expires: DateTime.UtcNow.AddMinutes(15),
             signingCredentials: signingCredentials
         );
 

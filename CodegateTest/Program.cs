@@ -97,6 +97,7 @@ builder.Services.AddScoped<IRepository<Course>, Repository<Course>>();
 builder.Services.AddScoped<IRepository<Instructor>, Repository<Instructor>>();
 builder.Services.AddScoped<IRepository<CourseInstructors>, Repository<CourseInstructors>>();
 builder.Services.AddScoped<IRepository<Contact>, Repository<Contact>>();
+builder.Services.AddScoped<IImageService, ImageService>();
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 
