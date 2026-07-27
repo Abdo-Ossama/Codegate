@@ -85,7 +85,7 @@ namespace CodegateTest.Areas.Admin
         public async Task<IActionResult> Update(
     int id,
     IFormFile? logo,
-    InstructorUpdateRequest instructorUpdateRequest)
+   [FromForm] InstructorUpdateRequest instructorUpdateRequest)
         {
             var instructor = await _instructorRepository.GetOneAsync(
                 e => e.Id == id

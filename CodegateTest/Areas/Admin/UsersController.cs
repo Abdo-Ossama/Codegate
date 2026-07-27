@@ -20,6 +20,7 @@ namespace CodegateTest.Areas.Admin
         {
             _userManager = userManager;
         }
+        
         [HttpGet("")]
         public async Task<IActionResult> GetAll(string? search, int page = 1)
         {
@@ -31,32 +32,42 @@ namespace CodegateTest.Areas.Admin
             {
                 page = 1;
             }
+
             int pageSize = 5;
             var totalPages = (int)Math.Ceiling(totalUsers / (double)pageSize);
 
             var finalUsers = await users
                 .Skip((page - 1) * pageSize)
-                .Take(pageSize).ToListAsync();
+                .Take(pageSize)
+                .ToListAsync();
 
+            var result = new List<object>();
+
+            foreach (var user in finalUsers)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+
+                result.Add(new
+                {
+                    user.Id,
+                    user.UserName,
+                    user.Email,
+                    user.EmailConfirmed,
+                    Role = roles.FirstOrDefault() 
+                });
+            }
 
             return Ok(new
             {
-                Users = finalUsers.Select(e => new
-                {
-                    e.Id,
-                    e.UserName,
-                    e.Email,
-                    e.EmailConfirmed,
-                    pageSize = pageSize,
-                    totalPages = totalPages,
-                    totalUsers = totalUsers
-
-
-                })
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                TotalUsers = totalUsers,
+                Users = result
             });
-
-
         }
+
+        
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(string id)
         {
@@ -69,11 +80,13 @@ namespace CodegateTest.Areas.Admin
                     Message = ["User is not Found"]
                 });
             }
+            var role = await _userManager.GetRolesAsync(user);
             return Ok(new
             {
                 user.UserName,
                 user.Email,
                 user.EmailConfirmed,
+                role 
             });
         }
 

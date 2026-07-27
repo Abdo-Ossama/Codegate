@@ -10,6 +10,6 @@ namespace CodegateTest.DTOs.Requests
 
         public string Title { get; set; } = null!;
 
-        public string? AvatarUrl { get; set; }
+      
     }
 }
