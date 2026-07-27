@@ -41,7 +41,7 @@ namespace CodegateTest.Areas.Admin
             return Ok(instructor);
         }
         [HttpPost]
-        public async Task<IActionResult> Create(IFormFile logo , InstructorCreateRequest instructorCreateRequest)
+        public async Task<IActionResult> Create(IFormFile logo , [FromForm]InstructorCreateRequest instructorCreateRequest)
         {
        var instructor = instructorCreateRequest.Adapt<Instructor>();
             if (logo is not null && logo.Length > 0)

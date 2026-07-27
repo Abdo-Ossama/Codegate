@@ -40,50 +40,64 @@ namespace CodegateTest.Areas.Identity
             _signInManger = signInManager;
             _accountService = accountService;
             _jWTHandler = jWTHandler;
-            _applicationUserOTPRepository=applicationUserOTPRepository;
+            _applicationUserOTPRepository = applicationUserOTPRepository;
         }
         [HttpPost("Register")]
         public async Task<IActionResult> Register(RegisterRequest registerRequest)
         {
             var user = registerRequest.Adapt<ApplicationUser>();
-            var seed = Uri.EscapeDataString($"{user.Fname}-{user.Lname}");
 
+            var seed = Uri.EscapeDataString($"{user.Fname}-{user.Lname}");
             user.ProfileImageUrl =
-                $"https://api.dicebear.com/10.x/initials/svg?seed={seed}"; // add avatar 
+                $"https://api.dicebear.com/10.x/initials/svg?seed={seed}";
+
             var result = await _userManager.CreateAsync(user, registerRequest.Password);
 
             if (!result.Succeeded)
             {
                 return BadRequest(result.Errors);
             }
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var ConfirmLink = Url.Action("Confirm", "Accounts", new { area = SD.IDENTITY_AREA, token, userId = user.Id }, Request.Scheme);
-            if (ConfirmLink is null)
-            {
-                return StatusCode(500, new APIResponce
-                {
-                    Message = ["Failed to generate confirmation link"]
-                });
-            }
 
-            await _accountService.sendEmailAsync(EmailType.ConfirmEmail, user, $"Click Here for Confirm Email {ConfirmLink}");
-            var roleResult = await _userManager.AddToRoleAsync(
-                 user,
-                SD.STUDENT_ROLE
-                );
+            var roleResult = await _userManager.AddToRoleAsync(user, SD.STUDENT_ROLE);
 
             if (!roleResult.Succeeded)
             {
                 return BadRequest(roleResult.Errors);
             }
 
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 
-            return Ok(new APIResponce
+            var confirmLink = Url.Action(
+                "Confirm",
+                "Accounts",
+                new
+                {
+                    area = SD.IDENTITY_AREA,
+                    token,
+                    userId = user.Id
+                },
+                Request.Scheme);
+
+            if (string.IsNullOrEmpty(confirmLink))
             {
-                StatusCode = 201, // Create
-                Message = ["Your Register is Completed Successfully .."],
-          
-            });
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new APIResponce
+                    {
+                        Message = ["Failed to generate confirmation link"]
+                    });
+            }
+
+            await _accountService.sendEmailAsync(
+                EmailType.ConfirmEmail,
+                user,
+                $"Click here to confirm your email: {confirmLink}");
+
+            return StatusCode(StatusCodes.Status201Created,
+                new APIResponce
+                {
+                    StatusCode = 201,
+                    Message = ["Your registration completed successfully."]
+                });
         }
 
         [HttpPost("Login")]
@@ -93,24 +107,34 @@ namespace CodegateTest.Areas.Identity
 
             if (user is null)
             {
-                return BadRequest(new APIResponce
+                return Unauthorized(new APIResponce
                 {
-                    Message = ["Invalid username/email or password"]
+                    StatusCode = StatusCodes.Status401Unauthorized,
+                    Message = ["Invalid username or password."]
                 });
             }
 
-            var result = await _signInManger.PasswordSignInAsync(user, loginRequest.Password, loginRequest.RememberMe, false);
+            var result = await _signInManger.PasswordSignInAsync(
+                user,
+                loginRequest.Password,
+                loginRequest.RememberMe,
+                lockoutOnFailure: true);
 
             if (result.IsNotAllowed)
             {
-                return Unauthorized(new APIResponce { Message = ["Confirm email first"] });
+                return Unauthorized(new APIResponce
+                {
+                    StatusCode = StatusCodes.Status401Unauthorized,
+                    Message = ["Please confirm your email first."]
+                });
             }
 
             if (result.IsLockedOut)
             {
                 return Unauthorized(new APIResponce
                 {
-                    Message = ["Account is locked due to multiple failed attempts"]
+                    StatusCode = StatusCodes.Status401Unauthorized,
+                    Message = ["Your account has been locked due to multiple failed login attempts."]
                 });
             }
 
@@ -118,21 +142,19 @@ namespace CodegateTest.Areas.Identity
             {
                 return Unauthorized(new APIResponce
                 {
-                    Message = ["Invalid username or password"]
+                    StatusCode = StatusCodes.Status401Unauthorized,
+                    Message = ["Invalid username or password."]
                 });
             }
 
-            var roles = await _userManager.GetRolesAsync(user); // List of userRoles
+            var token = await _jWTHandler.GenerateTokenAsync(user.Id, user.Email!);
 
-          var token =   await _jWTHandler.GenerateTokenAsync(user.Id, loginRequest.Email);
-
-            return Ok(new APIResponce()
+            return Ok(new APIResponce
             {
-                StatusCode = 200,
+                StatusCode = StatusCodes.Status200OK,
                 Message = [$"Welcome, {user.UserName}"],
                 Data = token
             });
-
         }
 
 
@@ -140,100 +162,142 @@ namespace CodegateTest.Areas.Identity
         public async Task<IActionResult> Confirm(string userId, string token)
         {
             var user = await _userManager.FindByIdAsync(userId);
+
             if (user is null)
-                return BadRequest();
-            await _userManager.ConfirmEmailAsync(user, token);
-            return Ok(new APIResponce()
             {
-                StatusCode = 200,
-                Message = ["Your Email is Confirmed Successfully"]
+                return NotFound(new APIResponce
+                {
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Message = ["User not found."]
+                });
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+
+            if (!result.Succeeded)
+            {
+                return BadRequest(new APIResponce
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+
+                });
+            }
+
+            return Ok(new APIResponce
+            {
+                StatusCode = StatusCodes.Status200OK,
+                Message = ["Your email has been confirmed successfully."]
             });
         }
 
-        [HttpGet("ResendEmailConfiramtion")]
-        public async Task<IActionResult> ResendEmailConfiramtion(string userId)
+        [HttpGet("ResendEmailConfirmation")]
+        public async Task<IActionResult> ResendEmailConfirmation(string userId)
         {
-
             var user = await _userManager.FindByIdAsync(userId);
-            if (user is not null && !user.EmailConfirmed)
+
+            if (user is null)
             {
-
-
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                var ConfirmLink = Url.Action("Confirm", "Accounts", new { area = SD.IDENTITY_AREA, token, userId = user.Id }, Request.Scheme);
-                if (ConfirmLink is null)
+                return NotFound(new APIResponce
                 {
-                    return StatusCode(500, new APIResponce
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Message = ["User not found."]
+                });
+            }
+
+            if (user.EmailConfirmed)
+            {
+                return BadRequest(new APIResponce
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = ["Email is already confirmed."]
+                });
+            }
+
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+
+            var confirmLink = Url.Action(
+                "Confirm",
+                "Accounts",
+                new
+                {
+                    area = SD.IDENTITY_AREA,
+                    token,
+                    userId = user.Id
+                },
+                Request.Scheme);
+
+            if (string.IsNullOrEmpty(confirmLink))
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new APIResponce
                     {
-                        Message = ["Failed to generate confirmation link"]
+                        Message = ["Failed to generate confirmation link."]
                     });
-                }
-
-                await _accountService.sendEmailAsync(EmailType.ConfirmEmail, user, $"Click Here for Confirm Email {ConfirmLink}");
-                var roleResult = await _userManager.AddToRoleAsync(
-                     user,
-                    SD.STUDENT_ROLE
-                    );
-
-                if (!roleResult.Succeeded)
-                {
-                    return BadRequest(roleResult.Errors);
-                }
-
             }
-            return Ok(new APIResponce()
+
+            await _accountService.sendEmailAsync(
+                EmailType.ConfirmEmail,
+                user,
+                $"Click here to confirm your email: {confirmLink}");
+
+            return Ok(new APIResponce
             {
-                StatusCode = 200,
-
-                Message = ["Resend Email Confirmation Successfully"]
-            }
-
-                );
-
-
+                StatusCode = StatusCodes.Status200OK,
+                Message = ["Confirmation email has been sent successfully."]
+            });
         }
-
 
 
 
         [HttpPost("Forget-Password")]
-        public async Task<IActionResult> ForgetPassword(ForgetPasswordRequest forgetPasswordrequest)
+        public async Task<IActionResult> ForgetPassword(ForgetPasswordRequest forgetPasswordRequest)
         {
+            var user = await _userManager.FindByEmailAsync(forgetPasswordRequest.Email);
 
-            var user = await _userManager.FindByEmailAsync(forgetPasswordrequest.Email);
-         
-
-            if (user is null) return NotFound();
-            var otp = new Random().Next(1000, 9999).ToString();
-            await _accountService.sendEmailAsync(EmailType.ForgetPassword, user!, $"This is the OTP : {otp} Please Don`t Share it ! ");
-            var otpsCount = (await _applicationUserOTPRepository
-                .GetAsync(e => e.ApplicationUserId == user.Id && e.CreatedAt >= DateTime.Now.AddHours(-24)))
-                .Count();
-            if (user is not null && otpsCount < 50)
+            if (user is null)
             {
-                await _applicationUserOTPRepository.CreateAsync(new ApplicationUserOTP
+                return NotFound(new APIResponce
                 {
-                    ApplicationUserId = user.Id,
-                    OTP = otp
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Message = ["User not found."]
                 });
             }
-            else if (otpsCount > 50)
-            {
 
+            var otpsCount = (await _applicationUserOTPRepository.GetAsync(
+                e => e.ApplicationUserId == user.Id &&
+                     e.CreatedAt >= DateTime.Now.AddHours(-24)))
+                .Count();
+
+            if (otpsCount >= 50)
+            {
                 return BadRequest(new APIResponce
                 {
-                    Message = ["Many Attemps Today , Please Try Again !"]
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = ["You have exceeded the maximum number of OTP requests today."]
                 });
             }
 
+            var otp = new Random().Next(1000, 9999).ToString();
+
+            await _applicationUserOTPRepository.CreateAsync(new ApplicationUserOTP
+            {
+                ApplicationUserId = user.Id,
+                OTP = otp
+            });
+
             await _applicationUserOTPRepository.CommitAsync();
+
+            await _accountService.sendEmailAsync(
+                EmailType.ForgetPassword,
+                user,
+                $"Your OTP is: {otp}. Please do not share it with anyone.");
+
             return Ok(new APIResponce
             {
-               Message  = ["The OTP Sent to Email Successfully !",]
-               
+                StatusCode = StatusCodes.Status200OK,
+                Message = ["OTP has been sent successfully."]
             });
         }
-
 
         [HttpPost("Validate-OTP")]
         public async Task<IActionResult> ValidateOTP(ValidateOTPRequest validateOTPRequest)
@@ -241,7 +305,7 @@ namespace CodegateTest.Areas.Identity
 
             var user = await _userManager.FindByIdAsync(validateOTPRequest.ApplicationUserId);
             if (user is null) return NotFound();
-          
+
             var otp = (await _applicationUserOTPRepository.GetAsync()).Where(e => e.IsValid && e.ApplicationUser.Id == user.Id)
                 .OrderBy(e => e.Id).LastOrDefault();
             if (otp is null || otp.OTP != validateOTPRequest.OTP)
@@ -258,8 +322,8 @@ namespace CodegateTest.Areas.Identity
                 await _applicationUserOTPRepository.CommitAsync();
                 return Ok(new APIResponce
                 {
-                    Message =[ "OTP verified successfully"],
-                  
+                    Message = ["OTP verified successfully"],
+
                 });
             }
 
@@ -268,43 +332,41 @@ namespace CodegateTest.Areas.Identity
 
 
 
-
         [HttpPost("Reset-Password")]
         public async Task<IActionResult> ResetPassword(ResetPasswordRequest resetPasswordRequest)
         {
-
             var user = await _userManager.FindByIdAsync(resetPasswordRequest.ApplicationUserId);
+
             if (user is null)
             {
-                return BadRequest(new APIResponce
+                return NotFound(new APIResponce
                 {
-                    Message = ["User is not found "],
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Message = ["User not found."]
                 });
-                
             }
 
-
-
             var userToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var result = await _userManager.ResetPasswordAsync(user, userToken, resetPasswordRequest.Password);
+
+            var result = await _userManager.ResetPasswordAsync(
+                user,
+                userToken,
+                resetPasswordRequest.Password);
 
             if (!result.Succeeded)
             {
-                return BadRequest(new APIResponce()
+                return BadRequest(new APIResponce
                 {
-                    Message =
-        [
-            "Password reset failed. Please make sure the reset link is valid and the new password meets the required requirements."
-        ]
+                    StatusCode = StatusCodes.Status400BadRequest,
+
                 });
             }
 
             return Ok(new APIResponce
             {
-                Message = ["Change Password Successfully"],
-
+                StatusCode = StatusCodes.Status200OK,
+                Message = ["Password changed successfully."]
             });
-
         }
     }
 }

@@ -1,4 +1,5 @@
 using CodegateTest.DataAccess;
+using CodegateTest.Models.CodegateTest.Models;
 using CodegateTest.Repositories;
 using CodegateTest.Repositories.IRepositories;
 using CodegateTest.Services;
@@ -97,6 +98,7 @@ builder.Services.AddScoped<IRepository<Course>, Repository<Course>>();
 builder.Services.AddScoped<IRepository<Instructor>, Repository<Instructor>>();
 builder.Services.AddScoped<IRepository<CourseInstructors>, Repository<CourseInstructors>>();
 builder.Services.AddScoped<IRepository<Contact>, Repository<Contact>>();
+builder.Services.AddScoped<IRepository<Review>, Repository<Review>>();
 builder.Services.AddScoped<IImageService, ImageService>();
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();

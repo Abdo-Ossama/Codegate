@@ -85,8 +85,14 @@ namespace CodegateTest
             user.Lname =
                 updateProfileRequest.Lname ?? user.Lname;
 
+            string? oldImageUrl = null;
+
             if (updateProfileRequest.ProfileImage is not null)
             {
+              
+                oldImageUrl = user.ProfileImageUrl;
+
+           
                 var imageUrl =
                     await _imageService.UploadImageAsync(
                         updateProfileRequest.ProfileImage,
@@ -101,6 +107,12 @@ namespace CodegateTest
             if (!result.Succeeded)
             {
                 return BadRequest(result.Errors);
+            }
+
+
+            if (!string.IsNullOrEmpty(oldImageUrl))
+            {
+                _imageService.DeleteImage(oldImageUrl, "profiles");
             }
 
             return Ok(new APIResponce

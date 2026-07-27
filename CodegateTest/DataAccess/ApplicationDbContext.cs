@@ -1,4 +1,5 @@
 ﻿using CodegateTest.Models;
+using CodegateTest.Models.CodegateTest.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,16 +27,37 @@ namespace CodegateTest.DataAccess
 
             modelBuilder.Entity<CourseInstructors>(entity =>
             {
-                entity.HasOne(ci => ci.Course)
-                    .WithMany(c => c.CourseInstructors)
-                    .HasForeignKey(ci => ci.CourseId)
+                entity.HasOne(e => e.Course)
+                    .WithMany(e => e.CourseInstructors)
+                    .HasForeignKey(e => e.CourseId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                entity.HasOne(ci => ci.Instructor)
-                    .WithMany(i => i.CourseInstructors)
-                    .HasForeignKey(ci => ci.InstructorId)
+                entity.HasOne(e => e.Instructor)
+                    .WithMany(e => e.CourseInstructors)
+                    .HasForeignKey(e => e.InstructorId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+
+            modelBuilder.Entity<Review>()
+       .HasOne(e => e.Student)
+       .WithMany()
+       .HasForeignKey(e => e.StudentId)
+       .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Review>()
+                .HasOne(e => e.Course)
+                .WithMany()
+                .HasForeignKey( e=> e.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Student Can Make feedback on course only ony time
+            modelBuilder.Entity<Review>()
+                .HasIndex(e => new
+                {
+                    e.StudentId,
+                    e.CourseId
+                })
+                .IsUnique();
         }
+
     }
 }
