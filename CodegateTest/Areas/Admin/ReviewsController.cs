@@ -11,12 +11,12 @@ namespace CodegateTest.Areas.Admin
     public class ReviewsController : ControllerBase
     {
         private readonly IRepository<Review> _reviewRepository;
-        private readonly IRepository<Course> _courseRepository;
+       
 
-        public ReviewsController(IRepository<Review> reviewRepository, IRepository<Course> courseRepository)
+        public ReviewsController(IRepository<Review> reviewRepository)
         {
             _reviewRepository = reviewRepository;
-            _courseRepository = courseRepository;
+       
         }
 
         [HttpGet]

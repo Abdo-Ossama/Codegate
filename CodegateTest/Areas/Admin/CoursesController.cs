@@ -1,4 +1,5 @@
 ﻿using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Services;
 using CodegateTest.Services.IServices;
 using Mapster;
 using Microsoft.AspNetCore.Http;
@@ -15,29 +16,33 @@ namespace CodegateTest.Areas.Admin
         private readonly IRepository<Course> _courseRepository;
         private readonly IRepository<Instructor> _instructorRepository;
         private readonly IRepository<CourseInstructors> _courseInstractorRepository;
+        private readonly IImageService _imageService;
 
 
 
         public CoursesController(IRepository<Course> courseRepository,
             IRepository<CourseInstructors> courseInstractorRepository,
-            IRepository<Instructor> instructorRepository) 
-        
+            IRepository<Instructor> instructorRepository,
+            IImageService imageService)
+
         {
             _courseRepository = courseRepository;
             _courseInstractorRepository = courseInstractorRepository;
             _instructorRepository = instructorRepository;
+            _imageService = imageService;
 
-            
+
+
         }
         [HttpGet("")]
-        public async Task<IActionResult> GetAll(int page = 1 )
+        public async Task<IActionResult> GetAll(int page = 1)
         {
-            var courses = await _courseRepository.GetAsync(e=>!e.IsDeleted,
-       includes: [e=>e.CourseInstructors , ]
-           
+            var courses = await _courseRepository.GetAsync(e => !e.IsDeleted,
+       includes: [e => e.CourseInstructors,]
+
    );
-            var courseInstructors = await _courseInstractorRepository.GetAsync(includes:[e => e.Instructor]);
-  
+            var courseInstructors = await _courseInstractorRepository.GetAsync(includes: [e => e.Instructor]);
+
             var totalCourses = courses.Count();
             int pageSize = 5;
 
@@ -48,7 +53,7 @@ namespace CodegateTest.Areas.Admin
             var cousreQuery = courses
      .Skip((page - 1) * pageSize)
      .Take(pageSize);
-     
+
 
             return Ok(new CoursesResponce()
             {
@@ -68,8 +73,8 @@ namespace CodegateTest.Areas.Admin
             .ToList()
                 }).ToList(),
                 pageSize = pageSize,
-                totalPages = totalPages ,
-                 totalCourses =totalCourses 
+                totalPages = totalPages,
+                totalCourses = totalCourses
 
 
             });
@@ -78,7 +83,7 @@ namespace CodegateTest.Areas.Admin
         }
 
 
-      [HttpGet("{id}")]
+        [HttpGet("{id}")]
         public async Task<IActionResult> Get(int id)
         {
             var course = await _courseRepository.GetOneAsync(
@@ -125,51 +130,24 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateCourse([FromForm] CreateCourseRequest createCourseRequest)
+        public async Task<IActionResult> CreateCourse(
+    [FromForm] CreateCourseRequest createCourseRequest)
         {
-    
-            var allowedExtensions = new[] { ".png", ".jpg", ".jpeg" };
-            var extension = Path.GetExtension(createCourseRequest.CoverImage.FileName)
-                .ToLowerInvariant();
-
-            if (!allowedExtensions.Contains(extension))
-            {
-                return BadRequest(new APIResponce
-                {
-                    StatusCode = 400,
-                    Message = ["Only PNG and JPG images are allowed"]
-                });
-            }
-
-            var newFile =
-                Guid.NewGuid().ToString()[..7] +
-                DateTime.UtcNow.ToString("yyyy-MM-dd") +
-                extension;
-
-            var filePath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "wwwroot",
-                "img",
-                "courses_img",
-                newFile
-            );
-
-            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-
-            using (var stream = System.IO.File.Create(filePath))
-            {
-                await createCourseRequest.CoverImage.CopyToAsync(stream);
-            }
-
             var course = new Course
             {
                 Name = createCourseRequest.Name,
                 Slug = createCourseRequest.Slug,
                 Price = createCourseRequest.Price,
                 Description = createCourseRequest.Description,
-                CoverImageUrl = newFile,
+                CoverImageUrl = await _imageService.UploadImageAsync(
+                    createCourseRequest.CoverImage,
+                    "courses_img"
+                ),
                 CourseInstructors = createCourseRequest.InstructorIds
-                    .Select(id => new CourseInstructors { InstructorId = id })
+                    .Select(id => new CourseInstructors
+                    {
+                        InstructorId = id
+                    })
                     .ToList()
             };
 
@@ -183,15 +161,15 @@ namespace CodegateTest.Areas.Admin
             });
         }
 
+
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(
-          int id,
-          [FromForm] CourseUpdateRequest courseUpdateRequest)
+      int id,
+      [FromForm] CourseUpdateRequest courseUpdateRequest)
         {
             var courseInDb = await _courseRepository.GetOneAsync(
                 e => e.Id == id,
                 includes: [e => e.CourseInstructors]
-               
             );
 
             if (courseInDb is null)
@@ -204,46 +182,21 @@ namespace CodegateTest.Areas.Admin
             }
 
             // Update Course Image
-            if (courseUpdateRequest.CoverImg is not null &&
-                courseUpdateRequest.CoverImg.Length > 0)
+            if (courseUpdateRequest.CoverImg is not null)
             {
-            
-                var newFile =
-                    Guid.NewGuid().ToString().Substring(0, 7) +
-                    DateTime.UtcNow.ToString("yyyy-MM-dd") +
-                    Path.GetExtension(courseUpdateRequest.CoverImg.FileName);
 
-                var filePath = Path.Combine(
-                    Directory.GetCurrentDirectory(),
-                    "wwwroot",
-                    "img",
-                    "courses_img",
-                    newFile
-                );
-
-                using (var stream = System.IO.File.Create(filePath))
-                {
-                    await courseUpdateRequest.CoverImg.CopyToAsync(stream);
-                }
-
-                // Delete old image
                 if (!string.IsNullOrEmpty(courseInDb.CoverImageUrl))
                 {
-                    var oldPhotoPath = Path.Combine(
-                        Directory.GetCurrentDirectory(),
-                        "wwwroot",
-                        "img",
-                        "courses_img",
-                        courseInDb.CoverImageUrl
+                    _imageService.DeleteImage(
+                        courseInDb.CoverImageUrl,
+                        "courses_img"
                     );
-
-                    if (System.IO.File.Exists(oldPhotoPath))
-                    {
-                        System.IO.File.Delete(oldPhotoPath);
-                    }
                 }
 
-                courseInDb.CoverImageUrl = newFile;
+                courseInDb.CoverImageUrl = await _imageService.UploadImageAsync(
+                    courseUpdateRequest.CoverImg,
+                    "courses_img"
+                );
             }
 
             // Update Course Data
@@ -262,7 +215,6 @@ namespace CodegateTest.Areas.Admin
             courseInDb.IsActive =
                 courseUpdateRequest.IsActive ?? courseInDb.IsActive;
 
-
             // Update Instructors
             if (courseUpdateRequest.InstructorIds is not null)
             {
@@ -270,13 +222,11 @@ namespace CodegateTest.Areas.Admin
 
                 foreach (var instructorId in courseUpdateRequest.InstructorIds)
                 {
-                    courseInDb.CourseInstructors.Add(
-                        new CourseInstructors
-                        {
-                            CourseId = courseInDb.Id,
-                            InstructorId = instructorId
-                        }
-                    );
+                    courseInDb.CourseInstructors.Add(new CourseInstructors
+                    {
+                        CourseId = courseInDb.Id,
+                        InstructorId = instructorId
+                    });
                 }
             }
 
@@ -284,9 +234,12 @@ namespace CodegateTest.Areas.Admin
 
             await _courseRepository.CommitAsync();
 
-            return NoContent();
+            return Ok(new APIResponce
+            {
+                StatusCode = 200,
+                Message = ["Course Updated Successfully"]
+            });
         }
-
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
@@ -317,5 +270,5 @@ namespace CodegateTest.Areas.Admin
     }
 
 
-    }
+}
 

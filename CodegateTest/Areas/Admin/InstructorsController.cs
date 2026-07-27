@@ -1,4 +1,5 @@
 ﻿using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Services.IServices;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,16 +12,19 @@ namespace CodegateTest.Areas.Admin
     public class InstructorsController : ControllerBase
     {
         private readonly IRepository<Instructor> _instructorRepository;
+        private readonly IImageService _imageService;
 
-        public InstructorsController(IRepository<Instructor> instructorRepository)
+        public InstructorsController(IRepository<Instructor> instructorRepository,
+            IImageService imageService)
         {
             _instructorRepository = instructorRepository;
+            _imageService = imageService;
         }
 
         [HttpGet("")]
         public async Task<IActionResult> GetAll()
         {
-         var instructors = await _instructorRepository.GetAsync(e => !e.IsDeleted);
+            var instructors = await _instructorRepository.GetAsync(e => !e.IsDeleted);
 
             return Ok(instructors);
         }
@@ -29,8 +33,8 @@ namespace CodegateTest.Areas.Admin
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(int id)
         {
-         var instructor = await _instructorRepository.GetOneAsync(e=>e.Id == id );
-            if(instructor is null)
+            var instructor = await _instructorRepository.GetOneAsync(e => e.Id == id);
+            if (instructor is null)
             {
                 return BadRequest(new APIResponce
                 {
@@ -40,36 +44,23 @@ namespace CodegateTest.Areas.Admin
             }
             return Ok(instructor);
         }
-        [HttpPost]
-        public async Task<IActionResult> Create(IFormFile logo , [FromForm]InstructorCreateRequest instructorCreateRequest)
-        {
-       var instructor = instructorCreateRequest.Adapt<Instructor>();
-            if (logo is not null && logo.Length > 0)
-            {
-              
-               var fileName =
-                    Guid.NewGuid().ToString().Substring(0, 7) +
-                    DateTime.UtcNow.ToString("yyyy-MM-dd") +
-                    Path.GetExtension(logo.FileName);
 
-                var folderPath = Path.Combine(
-                    Directory.GetCurrentDirectory(),
-                    "wwwroot",
-                    "img",
+
+
+
+        [HttpPost]
+        public async Task<IActionResult> Create(
+       IFormFile? logo,
+       [FromForm] InstructorCreateRequest instructorCreateRequest)
+        {
+            var instructor = instructorCreateRequest.Adapt<Instructor>();
+
+            if (logo is not null)
+            {
+                instructor.AvatarUrl = await _imageService.UploadImageAsync(
+                    logo,
                     "instructors_img"
                 );
-
-                Directory.CreateDirectory(folderPath);
-
-                var filePath =
-                    Path.Combine(folderPath, fileName);
-
-                using (var stream = System.IO.File.Create(filePath))
-                {
-                    await logo.CopyToAsync(stream);
-                }
-
-                instructor.AvatarUrl = fileName;
             }
 
             await _instructorRepository.CreateAsync(instructor);
@@ -78,14 +69,18 @@ namespace CodegateTest.Areas.Admin
             return Ok(new APIResponce
             {
                 StatusCode = 201,
-                Message = ["Insructor Created Successfully "]
+                Message = ["Instructor Created Successfully"]
             });
         }
+
+
+
+
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(
-    int id,
-    IFormFile? logo,
-   [FromForm] InstructorUpdateRequest instructorUpdateRequest)
+      int id,
+      IFormFile? logo,
+      [FromForm] InstructorUpdateRequest instructorUpdateRequest)
         {
             var instructor = await _instructorRepository.GetOneAsync(
                 e => e.Id == id
@@ -101,64 +96,30 @@ namespace CodegateTest.Areas.Admin
             }
 
             instructor.FirstName =
-                instructorUpdateRequest.FirstName
-                ?? instructor.FirstName;
+                instructorUpdateRequest.FirstName ?? instructor.FirstName;
 
             instructor.LastName =
-                instructorUpdateRequest.LastName
-                ?? instructor.LastName;
+                instructorUpdateRequest.LastName ?? instructor.LastName;
 
             instructor.Title =
-                instructorUpdateRequest.Title
-                ?? instructor.Title;
-
+                instructorUpdateRequest.Title ?? instructor.Title;
 
             // Update Logo
-            if (logo is not null && logo.Length > 0)
+            if (logo is not null)
             {
-                var fileName =
-                    Guid.NewGuid().ToString().Substring(0, 7) +
-                    DateTime.UtcNow.ToString("yyyy-MM-dd") +
-                    Path.GetExtension(logo.FileName);
-
-                var folderPath = Path.Combine(
-                    Directory.GetCurrentDirectory(),
-                    "wwwroot",
-                    "img",
-                    "instructors_img"
-                );
-
-                Directory.CreateDirectory(folderPath);
-
-                var filePath =
-                    Path.Combine(folderPath, fileName);
-
-                using (var stream = System.IO.File.Create(filePath))
-                {
-                    await logo.CopyToAsync(stream);
-                }
-
-
-                // Delete old logo
                 if (!string.IsNullOrEmpty(instructor.AvatarUrl))
                 {
-                    var oldLogoPath = Path.Combine(
-                        Directory.GetCurrentDirectory(),
-                        "wwwroot",
-                        "img",
-                        "instructors_img",
-                        instructor.AvatarUrl
+                    _imageService.DeleteImage(
+                        instructor.AvatarUrl,
+                        "instructors_img"
                     );
-
-                    if (System.IO.File.Exists(oldLogoPath))
-                    {
-                        System.IO.File.Delete(oldLogoPath);
-                    }
                 }
 
-                instructor.AvatarUrl = fileName;
+                instructor.AvatarUrl = await _imageService.UploadImageAsync(
+                    logo,
+                    "instructors_img"
+                );
             }
-
 
             _instructorRepository.Update(instructor);
 
@@ -170,7 +131,6 @@ namespace CodegateTest.Areas.Admin
                 Message = ["Instructor Updated Successfully"]
             });
         }
-
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
