@@ -1,5 +1,6 @@
 ﻿using CodegateTest.Models.CodegateTest.Models;
 using CodegateTest.Repositories.IRepositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,6 +9,7 @@ namespace CodegateTest.Areas.Admin
     [Route("api/[area]/[controller]")]
     [ApiController]
     [Area(SD.ADMIN_AREA)]
+    [Authorize(Roles = SD.ADMIN_ROLE)]
     public class ReviewsController : ControllerBase
     {
         private readonly IRepository<Review> _reviewRepository;
@@ -20,6 +22,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpGet]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> GetAll([FromQuery] ReviewStatus? status)
         {
             if (status.HasValue)
@@ -45,6 +48,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpGet("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Get(int id)
         {
             var review = await _reviewRepository.GetOneAsync(
@@ -69,6 +73,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpPut("{id}/Approve")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Approve(int id)
         {
             var review = await _reviewRepository.GetOneAsync(
@@ -99,6 +104,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpPut("{id}/Reject")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Reject(int id)
         {
             var review = await _reviewRepository.GetOneAsync(
@@ -129,6 +135,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Delete(int id)
         {
             var review = await _reviewRepository.GetOneAsync(

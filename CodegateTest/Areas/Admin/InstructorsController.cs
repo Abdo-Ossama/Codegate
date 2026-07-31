@@ -1,6 +1,7 @@
 ﻿using CodegateTest.Repositories.IRepositories;
 using CodegateTest.Services.IServices;
 using Mapster;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +23,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpGet("")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             var instructors = await _instructorRepository.GetAsync(e => !e.IsDeleted);
@@ -31,6 +33,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> Get(int id)
         {
             var instructor = await _instructorRepository.GetOneAsync(e => e.Id == id);
@@ -49,6 +52,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpPost]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Create(
        IFormFile? logo,
        [FromForm] InstructorCreateRequest instructorCreateRequest)
@@ -77,6 +81,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpPut("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Update(
       int id,
       IFormFile? logo,
@@ -133,6 +138,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Delete(int id)
         {
             var instructor = await _instructorRepository.GetOneAsync(

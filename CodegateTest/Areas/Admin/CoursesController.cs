@@ -2,6 +2,7 @@
 using CodegateTest.Services;
 using CodegateTest.Services.IServices;
 using Mapster;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,7 @@ namespace CodegateTest.Areas.Admin
 
         }
         [HttpGet("")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll(int page = 1)
         {
             var courses = await _courseRepository.GetAsync(e => !e.IsDeleted,
@@ -84,6 +86,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> Get(int id)
         {
             var course = await _courseRepository.GetOneAsync(
@@ -105,9 +108,9 @@ namespace CodegateTest.Areas.Admin
                     includes: [e => e.Instructor]
                 );
 
-            return Ok(new CourseResponce
+            return Ok(new CoursesResponce
             {
-                item = new
+                items = new
                 {
                     course.Id,
                     course.Name,
@@ -130,6 +133,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpPost]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> CreateCourse(
     [FromForm] CreateCourseRequest createCourseRequest)
         {
@@ -163,6 +167,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpPut("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Update(
       int id,
       [FromForm] CourseUpdateRequest courseUpdateRequest)
@@ -242,6 +247,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Delete(int id)
         {
             var course = await _courseRepository.GetOneAsync(

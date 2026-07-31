@@ -1,4 +1,5 @@
 ﻿using Mapster;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
@@ -11,7 +12,7 @@ namespace CodegateTest.Areas.Admin
     [Route("api/[area]/[controller]")]
     [ApiController]
     [Area(SD.ADMIN_ROLE)]
-
+    [Authorize(Roles = SD.ADMIN_ROLE)]
     public class UsersController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
@@ -22,6 +23,7 @@ namespace CodegateTest.Areas.Admin
         }
         
         [HttpGet("")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> GetAll(string? search, int page = 1)
         {
             var users = _userManager.Users.AsNoTracking();
@@ -69,6 +71,7 @@ namespace CodegateTest.Areas.Admin
 
         
         [HttpGet("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Get(string id)
         {
 
@@ -91,6 +94,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpPost]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Create(CreateUserRequest createUserRequest)
         {
             var user = createUserRequest.Adapt<ApplicationUser>();
@@ -137,6 +141,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpPut("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Update(
      string id,
      UpdateUserRequest updateUserRequest)
@@ -241,6 +246,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpPatch("{id}/toggle-status")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> ToggleStatus(string id)
         {
             var user = await _userManager.FindByIdAsync(id);
@@ -300,6 +306,7 @@ namespace CodegateTest.Areas.Admin
 
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Delete(string id)
         {
             var user = await _userManager.FindByIdAsync(id);

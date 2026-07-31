@@ -1,5 +1,6 @@
 ﻿using CodegateTest.Models.CodegateTest.Models;
 using CodegateTest.Repositories.IRepositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -9,6 +10,7 @@ namespace CodegateTest.Areas.Student
     [Route("api/[area]/[controller]")]
     [ApiController]
     [Area(SD.STUDENT_AREA)]
+    [Authorize(Roles = SD.STUDENT_ROLE)]
     public class ReviewsController : ControllerBase
     {
         private readonly IRepository<Review> _reviewRepository;

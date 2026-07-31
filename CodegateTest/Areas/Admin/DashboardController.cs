@@ -1,4 +1,5 @@
 ﻿using CodegateTest.Repositories.IRepositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,8 @@ namespace CodegateTest.Areas.Admin
     [Route("api/[area]/[controller]")]
     [ApiController]
     [Area(SD.ADMIN_ROLE)]
- 
+    [Authorize(Roles = SD.ADMIN_ROLE)]
+
     public class DashboardController : ControllerBase
         
     {

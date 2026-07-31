@@ -1,4 +1,5 @@
 ﻿using CodegateTest.Repositories.IRepositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,6 +8,7 @@ namespace CodegateTest.Areas.Admin
     [Route("api/[area]/[controller]")]
     [ApiController]
     [Area(SD.ADMIN_AREA)]
+    [Authorize(Roles = SD.ADMIN_ROLE)]
     public class ContactsController : ControllerBase
     {
         private readonly IRepository<Contact> _contactRepository;
@@ -17,6 +19,7 @@ namespace CodegateTest.Areas.Admin
         }
 
         [HttpGet("")]
+    
         public async Task<IActionResult> GetAll(int page = 1)
         {
             var contacts = await _contactRepository.GetAsync();
@@ -47,6 +50,7 @@ namespace CodegateTest.Areas.Admin
             });
         }
         [HttpGet("{id}")]
+
         public async Task<IActionResult> Get(int id)
         {
           var contact = await _contactRepository.GetOneAsync(e=>e.Id ==id );
