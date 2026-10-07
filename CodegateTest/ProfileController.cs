@@ -1,4 +1,4 @@
-﻿using CodegateTest.Services.IServices;
+using CodegateTest.Services.IServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -41,6 +41,7 @@ namespace CodegateTest
             {
                 return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["User is not found"]
                 });
             }
@@ -50,7 +51,7 @@ namespace CodegateTest
 
                 FullName = $"{user.Fname} {user.Lname}",
                 Email = user.Email!,
-                ProfileImage = user.ProfileImageUrl
+                ProfileImage = _imageService.GetImageUrl(user.ProfileImageUrl, "profiles")
 
             });
         }
@@ -75,6 +76,7 @@ namespace CodegateTest
             {
                 return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["User is not found"]
                 });
             }
@@ -86,6 +88,7 @@ namespace CodegateTest
                 updateProfileRequest.Lname ?? user.Lname;
 
             string? oldImageUrl = null;
+            string? newImage = null;
 
             if (updateProfileRequest.ProfileImage is not null)
             {
@@ -93,20 +96,34 @@ namespace CodegateTest
                 oldImageUrl = user.ProfileImageUrl;
 
            
-                var imageUrl =
-                    await _imageService.UploadImageAsync(
+                try
+                {
+                    newImage = await _imageService.UploadImageAsync(
                         updateProfileRequest.ProfileImage,
-                        "profiles"
-                    );
-
-                user.ProfileImageUrl = imageUrl;
+                        "profiles");
+                    user.ProfileImageUrl = newImage;
+                }
+                catch (ArgumentException exception)
+                {
+                    return BadRequest(new APIResponce { StatusCode = 400, Message = [exception.Message] });
+                }
             }
 
-            var result = await _userManager.UpdateAsync(user);
-
-            if (!result.Succeeded)
+            try
             {
-                return BadRequest(result.Errors);
+                var result = await _userManager.UpdateAsync(user);
+                if (!result.Succeeded)
+                {
+                    if (newImage is not null)
+                        _imageService.DeleteImage(newImage, "profiles");
+                    return BadRequest(result.Errors);
+                }
+            }
+            catch
+            {
+                if (newImage is not null)
+                    _imageService.DeleteImage(newImage, "profiles");
+                throw;
             }
 
 

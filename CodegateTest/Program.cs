@@ -57,9 +57,11 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.SignIn.RequireConfirmedEmail = true;
 
     options.Password.RequiredLength = 8;
+    options.Tokens.PasswordResetTokenProvider = "PasswordReset";
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
-.AddDefaultTokenProviders();
+.AddDefaultTokenProviders()
+.AddTokenProvider<PasswordResetTokenProvider>("PasswordReset");
 
 
 // JWT Authentication
@@ -150,7 +152,8 @@ using (var scope = app.Services.CreateScope())
 app.UseHttpsRedirection();
 
 
-
+app.UseCors();
+app.UseStaticFiles();
 app.UseAuthentication();
 
 app.UseAuthorization();

@@ -1,4 +1,4 @@
-﻿using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Repositories.IRepositories;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -26,8 +26,9 @@ namespace CodegateTest
            await _contactRepository.CreateAsync(contact);
            await _contactRepository.CommitAsync();
 
-            return Ok(new APIResponce
+            return StatusCode(StatusCodes.Status201Created, new APIResponce
             {
+                StatusCode = 201,
                 Message = ["Contact message created successfully"]
             });
         }

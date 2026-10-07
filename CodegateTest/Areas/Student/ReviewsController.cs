@@ -1,5 +1,6 @@
-﻿using CodegateTest.Models.CodegateTest.Models;
+using CodegateTest.Models.CodegateTest.Models;
 using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Services.IServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,12 +16,15 @@ namespace CodegateTest.Areas.Student
     {
         private readonly IRepository<Review> _reviewRepository;
         private readonly IRepository<Course> _courseRepository;
+        private readonly IImageService _imageService;
 
         public ReviewsController(IRepository<Review> reviewRepository,
-             IRepository<Course> courseRepository)
+             IRepository<Course> courseRepository,
+             IImageService imageService)
         {
             _reviewRepository = reviewRepository;
             _courseRepository = courseRepository;
+            _imageService = imageService;
         }
 
         [HttpPost]
@@ -38,13 +42,14 @@ namespace CodegateTest.Areas.Student
             }
 
             var course = await _courseRepository.GetOneAsync(
-                c => c.Id == request.CourseId
+                c => c.Id == request.CourseId && !c.IsDeleted
             );
 
             if (course is null)
             {
                 return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["Course not found"]
                 });
             }
@@ -60,6 +65,7 @@ namespace CodegateTest.Areas.Student
             {
                 return BadRequest(new APIResponce
                 {
+                    StatusCode = 400,
                     Message =
                     [
                         "You have already reviewed this course"
@@ -80,7 +86,7 @@ namespace CodegateTest.Areas.Student
 
             await _reviewRepository.CommitAsync();
 
-            return Ok(new APIResponce
+            return StatusCode(StatusCodes.Status201Created, new APIResponce
             {
                 StatusCode = 201,
                 Message = ["Review created successfully"]
@@ -111,6 +117,7 @@ namespace CodegateTest.Areas.Student
             {
                 return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["Review not found"]
                 });
             }
@@ -162,6 +169,7 @@ namespace CodegateTest.Areas.Student
             {
                 return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["Review not found"]
                 });
             }
@@ -186,7 +194,7 @@ namespace CodegateTest.Areas.Student
         [HttpGet("Course/{courseId}")]
         public async Task<IActionResult> GetCourseReviews(int courseId)
         {
-            var course = await _courseRepository.GetOneAsync(e => e.Id == courseId);
+            var course = await _courseRepository.GetOneAsync(e => e.Id == courseId && !e.IsDeleted);
 
             if (course is null)
             {
@@ -209,7 +217,7 @@ namespace CodegateTest.Areas.Student
                 e.Rating,
                 e.Feedback,
                 StudentName = $"{e.Student.Fname} {e.Student.Lname}",
-                StudentImage = e.Student.ProfileImageUrl,
+                StudentImage = _imageService.GetImageUrl(e.Student.ProfileImageUrl, "profiles"),
                 e.CreatedAt
             });
 

@@ -1,0 +1,565 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/Admin/Contacts",
+    "permission": "Admin",
+    "action": "GetAll",
+    "parameters": [
+      {
+        "name": "page",
+        "type": "Int32",
+        "source": "query",
+        "defaultValue": 1
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Contacts/{id}",
+    "permission": "Admin",
+    "action": "Get",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Admin/Contacts/{id}",
+    "permission": "Admin",
+    "action": "Update",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      },
+      {
+        "name": "updateContactRequest",
+        "type": "UpdateContactRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/Admin/Contacts/{id}/read",
+    "permission": "Admin",
+    "action": "MarkAsRead",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/Admin/Contacts/{id}",
+    "permission": "Admin",
+    "action": "Delete",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Courses",
+    "permission": "Public",
+    "action": "GetAll",
+    "parameters": [
+      {
+        "name": "page",
+        "type": "Int32",
+        "source": "query",
+        "defaultValue": 1
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Courses/{id}",
+    "permission": "Public",
+    "action": "Get",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Admin/Courses",
+    "permission": "Admin",
+    "action": "CreateCourse",
+    "parameters": [
+      {
+        "name": "createCourseRequest",
+        "type": "CreateCourseRequest",
+        "source": "form"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Admin/Courses/{id}",
+    "permission": "Admin",
+    "action": "Update",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      },
+      {
+        "name": "courseUpdateRequest",
+        "type": "CourseUpdateRequest",
+        "source": "form"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/Admin/Courses/{id}",
+    "permission": "Admin",
+    "action": "Delete",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Dashboard",
+    "permission": "Admin",
+    "action": "GetDashboard",
+    "parameters": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Instructors",
+    "permission": "Public",
+    "action": "GetAll",
+    "parameters": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Instructors/{id}",
+    "permission": "Public",
+    "action": "Get",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Admin/Instructors",
+    "permission": "Admin",
+    "action": "Create",
+    "parameters": [
+      {
+        "name": "logo",
+        "type": "IFormFile",
+        "source": "form"
+      },
+      {
+        "name": "instructorCreateRequest",
+        "type": "InstructorCreateRequest",
+        "source": "form"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Admin/Instructors/{id}",
+    "permission": "Admin",
+    "action": "Update",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      },
+      {
+        "name": "logo",
+        "type": "IFormFile",
+        "source": "form"
+      },
+      {
+        "name": "instructorUpdateRequest",
+        "type": "InstructorUpdateRequest",
+        "source": "form"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/Admin/Instructors/{id}",
+    "permission": "Admin",
+    "action": "Delete",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Reviews",
+    "permission": "Admin",
+    "action": "GetAll",
+    "parameters": [
+      {
+        "name": "status",
+        "type": "Nullable\u00601",
+        "source": "query"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Reviews/{id}",
+    "permission": "Admin",
+    "action": "Get",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Admin/Reviews/{id}/Approve",
+    "permission": "Admin",
+    "action": "Approve",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Admin/Reviews/{id}/Reject",
+    "permission": "Admin",
+    "action": "Reject",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/Admin/Reviews/{id}",
+    "permission": "Admin",
+    "action": "Delete",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Users",
+    "permission": "Admin",
+    "action": "GetAll",
+    "parameters": [
+      {
+        "name": "search",
+        "type": "String",
+        "source": "query"
+      },
+      {
+        "name": "page",
+        "type": "Int32",
+        "source": "query",
+        "defaultValue": 1
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Admin/Users/{id}",
+    "permission": "Admin",
+    "action": "Get",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "String",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Admin/Users",
+    "permission": "Admin",
+    "action": "Create",
+    "parameters": [
+      {
+        "name": "createUserRequest",
+        "type": "CreateUserRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Admin/Users/{id}",
+    "permission": "Admin",
+    "action": "Update",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "String",
+        "source": "path"
+      },
+      {
+        "name": "updateUserRequest",
+        "type": "UpdateUserRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/Admin/Users/{id}/toggle-status",
+    "permission": "Admin",
+    "action": "ToggleStatus",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "String",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/Admin/Users/{id}",
+    "permission": "Admin",
+    "action": "Delete",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "String",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Identity/Accounts/Register",
+    "permission": "Public",
+    "action": "Register",
+    "parameters": [
+      {
+        "name": "registerRequest",
+        "type": "RegisterRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Identity/Accounts/Login",
+    "permission": "Public",
+    "action": "Login",
+    "parameters": [
+      {
+        "name": "loginRequest",
+        "type": "LoginRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Identity/Accounts/Confirm",
+    "permission": "Public",
+    "action": "Confirm",
+    "parameters": [
+      {
+        "name": "userId",
+        "type": "String",
+        "source": "query"
+      },
+      {
+        "name": "token",
+        "type": "String",
+        "source": "query"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Identity/Accounts/ResendEmailConfirmation",
+    "permission": "Public",
+    "action": "ResendEmailConfirmation",
+    "parameters": [
+      {
+        "name": "userId",
+        "type": "String",
+        "source": "query"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Identity/Accounts/Forget-Password",
+    "permission": "Public",
+    "action": "ForgetPassword",
+    "parameters": [
+      {
+        "name": "forgetPasswordRequest",
+        "type": "ForgetPasswordRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Identity/Accounts/Validate-OTP",
+    "permission": "Public",
+    "action": "ValidateOTP",
+    "parameters": [
+      {
+        "name": "validateOTPRequest",
+        "type": "ValidateOTPRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Identity/Accounts/Reset-Password",
+    "permission": "Public",
+    "action": "ResetPassword",
+    "parameters": [
+      {
+        "name": "resetPasswordRequest",
+        "type": "ResetPasswordRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Student/Reviews",
+    "permission": "Student",
+    "action": "Create",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "CreateReviewRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Student/Reviews/{id}",
+    "permission": "Student",
+    "action": "Update",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      },
+      {
+        "name": "updateReviewRequest",
+        "type": "UpdateReviewRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/Student/Reviews/{id}",
+    "permission": "Student",
+    "action": "Delete",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Student/Reviews/Course/{courseId}",
+    "permission": "Student",
+    "action": "GetCourseReviews",
+    "parameters": [
+      {
+        "name": "courseId",
+        "type": "Int32",
+        "source": "path"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/Contacts",
+    "permission": "Public",
+    "action": "Create",
+    "parameters": [
+      {
+        "name": "createContactRequest",
+        "type": "CreateContactRequest",
+        "source": "json"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/Profile",
+    "permission": "Authenticated",
+    "action": "Get",
+    "parameters": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/Profile",
+    "permission": "Authenticated",
+    "action": "Update",
+    "parameters": [
+      {
+        "name": "updateProfileRequest",
+        "type": "UpdateProfileRequest",
+        "source": "form"
+      }
+    ]
+  }
+]

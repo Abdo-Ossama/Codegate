@@ -1,4 +1,4 @@
-﻿using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Repositories.IRepositories;
 using CodegateTest.Services.IServices;
 using Mapster;
 using Microsoft.AspNetCore.Authorization;
@@ -28,7 +28,7 @@ namespace CodegateTest.Areas.Admin
         {
             var instructors = await _instructorRepository.GetAsync(e => !e.IsDeleted);
 
-            return Ok(instructors);
+            return Ok(instructors.Select(ToResponse));
         }
 
 
@@ -36,16 +36,16 @@ namespace CodegateTest.Areas.Admin
         [AllowAnonymous]
         public async Task<IActionResult> Get(int id)
         {
-            var instructor = await _instructorRepository.GetOneAsync(e => e.Id == id);
+            var instructor = await _instructorRepository.GetOneAsync(e => e.Id == id && !e.IsDeleted);
             if (instructor is null)
             {
-                return BadRequest(new APIResponce
+                return NotFound(new APIResponce
                 {
                     StatusCode = 404,
                     Message = ["Instructor is Not Found"]
                 });
             }
-            return Ok(instructor);
+            return Ok(ToResponse(instructor));
         }
 
 
@@ -59,18 +59,36 @@ namespace CodegateTest.Areas.Admin
         {
             var instructor = instructorCreateRequest.Adapt<Instructor>();
 
-            if (logo is not null)
+            string? newImage = null;
+            try
             {
-                instructor.AvatarUrl = await _imageService.UploadImageAsync(
-                    logo,
-                    "instructors_img"
-                );
+                if (logo is not null)
+                {
+                    newImage = await _imageService.UploadImageAsync(logo, "instructors_img");
+                    instructor.AvatarUrl = newImage;
+                }
+                await _instructorRepository.CreateAsync(instructor);
+                if (await _instructorRepository.CommitAsync() <= 0)
+                {
+                    if (newImage is not null)
+                        _imageService.DeleteImage(newImage, "instructors_img");
+                    return SaveImageFailure();
+                }
+            }
+            catch (ArgumentException exception)
+            {
+                if (newImage is not null)
+                    _imageService.DeleteImage(newImage, "instructors_img");
+                return BadRequest(new APIResponce { StatusCode = 400, Message = [exception.Message] });
+            }
+            catch
+            {
+                if (newImage is not null)
+                    _imageService.DeleteImage(newImage, "instructors_img");
+                throw;
             }
 
-            await _instructorRepository.CreateAsync(instructor);
-            await _instructorRepository.CommitAsync();
-
-            return Ok(new APIResponce
+            return StatusCode(StatusCodes.Status201Created, new APIResponce
             {
                 StatusCode = 201,
                 Message = ["Instructor Created Successfully"]
@@ -88,7 +106,7 @@ namespace CodegateTest.Areas.Admin
       [FromForm] InstructorUpdateRequest instructorUpdateRequest)
         {
             var instructor = await _instructorRepository.GetOneAsync(
-                e => e.Id == id
+                e => e.Id == id && !e.IsDeleted
             );
 
             if (instructor is null)
@@ -109,26 +127,38 @@ namespace CodegateTest.Areas.Admin
             instructor.Title =
                 instructorUpdateRequest.Title ?? instructor.Title;
 
-            // Update Logo
-            if (logo is not null)
+            var oldImage = instructor.AvatarUrl;
+            string? newImage = null;
+            try
             {
-                if (!string.IsNullOrEmpty(instructor.AvatarUrl))
+                if (logo is not null)
                 {
-                    _imageService.DeleteImage(
-                        instructor.AvatarUrl,
-                        "instructors_img"
-                    );
+                    newImage = await _imageService.UploadImageAsync(logo, "instructors_img");
+                    instructor.AvatarUrl = newImage;
                 }
-
-                instructor.AvatarUrl = await _imageService.UploadImageAsync(
-                    logo,
-                    "instructors_img"
-                );
+                _instructorRepository.Update(instructor);
+                var saved = await _instructorRepository.CommitAsync();
+                if (newImage is not null && saved <= 0)
+                {
+                    _imageService.DeleteImage(newImage, "instructors_img");
+                    return SaveImageFailure();
+                }
+            }
+            catch (ArgumentException exception)
+            {
+                if (newImage is not null)
+                    _imageService.DeleteImage(newImage, "instructors_img");
+                return BadRequest(new APIResponce { StatusCode = 400, Message = [exception.Message] });
+            }
+            catch
+            {
+                if (newImage is not null)
+                    _imageService.DeleteImage(newImage, "instructors_img");
+                throw;
             }
 
-            _instructorRepository.Update(instructor);
-
-            await _instructorRepository.CommitAsync();
+            if (newImage is not null && !string.IsNullOrEmpty(oldImage))
+                _imageService.DeleteImage(oldImage, "instructors_img");
 
             return Ok(new APIResponce
             {
@@ -137,12 +167,30 @@ namespace CodegateTest.Areas.Admin
             });
         }
 
+        private object ToResponse(Instructor instructor) => new
+        {
+            instructor.Id,
+            instructor.FirstName,
+            instructor.LastName,
+            instructor.Title,
+            AvatarUrl = _imageService.GetImageUrl(instructor.AvatarUrl, "instructors_img"),
+            instructor.CreatedAt,
+            instructor.IsDeleted,
+            instructor.CourseInstructors
+        };
+
+        private IActionResult SaveImageFailure() => StatusCode(500, new APIResponce
+        {
+            StatusCode = 500,
+            Message = ["Failed to save the instructor. The previous image has been kept."]
+        });
+
         [HttpDelete("{id}")]
         [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Delete(int id)
         {
             var instructor = await _instructorRepository.GetOneAsync(
-                e => e.Id == id
+                e => e.Id == id && !e.IsDeleted
             );
 
             if (instructor is null)

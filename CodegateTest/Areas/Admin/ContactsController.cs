@@ -1,4 +1,4 @@
-﻿using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Repositories.IRepositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -56,8 +56,9 @@ namespace CodegateTest.Areas.Admin
           var contact = await _contactRepository.GetOneAsync(e=>e.Id ==id );
             if(contact is null)
             {
-                return BadRequest(new APIResponce
+                return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["No Contact "]
                 });
             }
@@ -77,8 +78,9 @@ namespace CodegateTest.Areas.Admin
 
             if (contact is null)
             {
-                return BadRequest(new APIResponce
+                return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["Contact not found"]
                 });
             }
@@ -103,6 +105,7 @@ namespace CodegateTest.Areas.Admin
 
             return Ok(new APIResponce
             {
+                StatusCode = 200,
                 Message = ["Contact updated successfully"]
             });
         }
@@ -118,8 +121,9 @@ namespace CodegateTest.Areas.Admin
 
             if (contact is null)
             {
-                return BadRequest(new APIResponce
+                return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["Contact not found"]
                 });
             }
@@ -131,6 +135,7 @@ namespace CodegateTest.Areas.Admin
 
             return Ok(new APIResponce
             {
+                StatusCode = 200,
                 Message = ["Contact marked as read successfully"]
             });
         }
@@ -146,8 +151,9 @@ namespace CodegateTest.Areas.Admin
 
             if (contact is null)
             {
-                return BadRequest(new APIResponce
+                return NotFound(new APIResponce
                 {
+                    StatusCode = 404,
                     Message = ["Contact not found"]
                 });
             }
@@ -157,6 +163,7 @@ namespace CodegateTest.Areas.Admin
 
             return Ok(new APIResponce
             {
+                StatusCode = 200,
                 Message = ["Contact deleted successfully"]
             });
         }

@@ -2,6 +2,7 @@
 {
     public interface IImageService
     {
+        string? GetImageUrl(string? fileName, string folderName);
         
         Task<string> UploadImageAsync(
             IFormFile image,

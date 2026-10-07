@@ -19,6 +19,7 @@ namespace CodegateTest.DataAccess
         public DbSet<Contact> Contacts { get; set; }
         public DbSet<CourseInstructors> CourseInstructors { get; set; }
         public DbSet<Review> Reviews { get; set; }
+        public DbSet<ApplicationUserOTP> ApplicationUserOTPs { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

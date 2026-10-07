@@ -1,15 +1,10 @@
-﻿
-using CodegateTest.Models;
 using CodegateTest.Repositories.IRepositories;
 using CodegateTest.Services;
 using CodegateTest.Services.IServices;
 using Mapster;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using System.Diagnostics;
+using System.Security.Cryptography;
 using LoginRequest = CodegateTest.DTOs.Requests.LoginRequest;
 using RegisterRequest = CodegateTest.DTOs.Requests.RegisterRequest;
 using ResetPasswordRequest = CodegateTest.DTOs.Requests.ResetPasswordRequest;
@@ -27,11 +22,13 @@ namespace CodegateTest.Areas.Identity
         private readonly IAccountService _accountService;
         private readonly IJWTHandler _jWTHandler;
         private readonly IRepository<ApplicationUserOTP> _applicationUserOTPRepository;
+        private readonly ILogger<AccountsController> _logger;
         public AccountsController(UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IAccountService accountService,
             IJWTHandler jWTHandler,
-            IRepository<ApplicationUserOTP> applicationUserOTPRepository
+            IRepository<ApplicationUserOTP> applicationUserOTPRepository,
+            ILogger<AccountsController> logger
 
             )
         {
@@ -41,6 +38,7 @@ namespace CodegateTest.Areas.Identity
             _accountService = accountService;
             _jWTHandler = jWTHandler;
             _applicationUserOTPRepository = applicationUserOTPRepository;
+            _logger = logger;
         }
         [HttpPost("Register")]
         public async Task<IActionResult> Register(RegisterRequest registerRequest)
@@ -55,48 +53,39 @@ namespace CodegateTest.Areas.Identity
 
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
-            }
-
-            var roleResult = await _userManager.AddToRoleAsync(user, SD.STUDENT_ROLE);
-
-            if (!roleResult.Succeeded)
-            {
-                return BadRequest(roleResult.Errors);
-            }
-
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-
-            var confirmLink = Url.Action(
-                "Confirm",
-                "Accounts",
-                new
+                return BadRequest(new APIResponce
                 {
-                    area = SD.IDENTITY_AREA,
-                    token,
-                    userId = user.Id
-                },
-                Request.Scheme);
-
-            if (string.IsNullOrEmpty(confirmLink))
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError,
-                    new APIResponce
-                    {
-                        Message = ["Failed to generate confirmation link"]
-                    });
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = result.Errors.Select(error => error.Description).ToArray()
+                });
             }
 
-            await _accountService.sendEmailAsync(
-                EmailType.ConfirmEmail,
-                user,
-                $"Click here to confirm your email: {confirmLink}");
+            try
+            {
+                var roleResult = await _userManager.AddToRoleAsync(user, SD.STUDENT_ROLE);
+                if (!roleResult.Succeeded)
+                {
+                    _logger.LogError("Student role assignment failed for user {UserId}: {Errors}",
+                        user.Id, string.Join("; ", roleResult.Errors.Select(error => error.Description)));
+                    return await RollbackRegistrationAsync(user);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Student role assignment failed for user {UserId}", user.Id);
+                return await RollbackRegistrationAsync(user);
+            }
+
+            var emailSent = await TrySendConfirmationAsync(user, EmailType.ConfirmEmail);
 
             return StatusCode(StatusCodes.Status201Created,
                 new APIResponce
                 {
                     StatusCode = 201,
-                    Message = ["Your registration completed successfully."]
+                    Message = emailSent
+                        ? ["Your registration completed successfully. Please confirm your email."]
+                        : ["Your account was created, but the confirmation email could not be sent. Please request a new confirmation email."],
+                    Data = new { UserId = user.Id, EmailConfirmationSent = emailSent }
                 });
         }
 
@@ -179,7 +168,7 @@ namespace CodegateTest.Areas.Identity
                 return BadRequest(new APIResponce
                 {
                     StatusCode = StatusCodes.Status400BadRequest,
-
+                    Message = ["The confirmation link is invalid or expired. Please request a new confirmation email."]
                 });
             }
 
@@ -213,32 +202,15 @@ namespace CodegateTest.Areas.Identity
                 });
             }
 
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-
-            var confirmLink = Url.Action(
-                "Confirm",
-                "Accounts",
-                new
-                {
-                    area = SD.IDENTITY_AREA,
-                    token,
-                    userId = user.Id
-                },
-                Request.Scheme);
-
-            if (string.IsNullOrEmpty(confirmLink))
+            if (!await TrySendConfirmationAsync(user, EmailType.ResendEmailConfirmation))
             {
-                return StatusCode(StatusCodes.Status500InternalServerError,
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
                     new APIResponce
                     {
-                        Message = ["Failed to generate confirmation link."]
+                        StatusCode = StatusCodes.Status503ServiceUnavailable,
+                        Message = ["Unable to send the confirmation email. Please try again later."]
                     });
             }
-
-            await _accountService.sendEmailAsync(
-                EmailType.ConfirmEmail,
-                user,
-                $"Click here to confirm your email: {confirmLink}");
 
             return Ok(new APIResponce
             {
@@ -249,10 +221,64 @@ namespace CodegateTest.Areas.Identity
 
 
 
-        [HttpPost("Forget-Password")]
-        public async Task<IActionResult> ForgetPassword(ForgetPasswordRequest forgetPasswordRequest)
+        private async Task<bool> TrySendConfirmationAsync(ApplicationUser user, EmailType emailType)
         {
-            var user = await _userManager.FindByEmailAsync(forgetPasswordRequest.Email);
+            try
+            {
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var confirmLink = Url.Action("Confirm", "Accounts",
+                    new { area = SD.IDENTITY_AREA, token, userId = user.Id }, Request.Scheme);
+                if (string.IsNullOrEmpty(confirmLink))
+                {
+                    _logger.LogError("Failed to generate confirmation link for user {UserId}", user.Id);
+                    return false;
+                }
+
+                await _accountService.sendEmailAsync(emailType, user,
+                    $"Click here to confirm your email: {confirmLink}");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to send confirmation email for user {UserId}", user.Id);
+                return false;
+            }
+        }
+
+        private async Task<IActionResult> RollbackRegistrationAsync(ApplicationUser user)
+        {
+            try
+            {
+                var rollback = await _userManager.DeleteAsync(user);
+                if (rollback.Succeeded)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, new APIResponce
+                    {
+                        StatusCode = StatusCodes.Status500InternalServerError,
+                        Message = ["Registration could not be completed. Please try again later."]
+                    });
+                }
+                _logger.LogError("Failed to remove incomplete account {UserId}: {Errors}",
+                    user.Id, string.Join("; ", rollback.Errors.Select(error => error.Description)));
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to remove incomplete account {UserId}", user.Id);
+            }
+
+            return StatusCode(StatusCodes.Status500InternalServerError, new APIResponce
+            {
+                StatusCode = StatusCodes.Status500InternalServerError,
+                Message = ["Your account may exist, but registration could not be completed. Please contact support before registering again."]
+            });
+        }
+
+        [HttpPost("Forget-Password")]
+        public async Task<IActionResult> ForgetPassword(
+     ForgetPasswordRequest forgetPasswordRequest)
+        {
+            var user = await _userManager.FindByEmailAsync(
+                forgetPasswordRequest.Email);
 
             if (user is null)
             {
@@ -263,9 +289,11 @@ namespace CodegateTest.Areas.Identity
                 });
             }
 
+            var now = DateTime.UtcNow;
+
             var otpsCount = (await _applicationUserOTPRepository.GetAsync(
                 e => e.ApplicationUserId == user.Id &&
-                     e.CreatedAt >= DateTime.Now.AddHours(-24)))
+                     e.CreatedAt >= now.AddHours(-24)))
                 .Count();
 
             if (otpsCount >= 50)
@@ -273,69 +301,76 @@ namespace CodegateTest.Areas.Identity
                 return BadRequest(new APIResponce
                 {
                     StatusCode = StatusCodes.Status400BadRequest,
-                    Message = ["You have exceeded the maximum number of OTP requests today."]
+                    Message =
+                    [
+                        "You have exceeded the maximum number " +
+                "of OTP requests today."
+                    ]
                 });
             }
 
-            var otp = new Random().Next(1000, 9999).ToString();
+            // إلغاء الأكواد السابقة عند طلب كود جديد.
+            var previousOtps = await _applicationUserOTPRepository.GetAsync(
+                e => e.ApplicationUserId == user.Id && !e.IsUsed);
 
-            await _applicationUserOTPRepository.CreateAsync(new ApplicationUserOTP
+            foreach (var previousOtp in previousOtps)
             {
-                ApplicationUserId = user.Id,
-                OTP = otp
-            });
+                previousOtp.IsUsed = true;
+                _applicationUserOTPRepository.Update(previousOtp);
+            }
 
-            await _applicationUserOTPRepository.CommitAsync();
+            var otp = RandomNumberGenerator
+                .GetInt32(1000, 10000)
+                .ToString();
+
+            await _applicationUserOTPRepository.CreateAsync(
+                new ApplicationUserOTP
+                {
+                    ApplicationUserId = user.Id,
+                    OTP = otp,
+                    IsUsed = false,
+                    CreatedAt = now,
+                    ExpiredAt = now.AddMinutes(10)
+                });
+
+            var saved = await _applicationUserOTPRepository.CommitAsync();
+
+            if (saved <= 0)
+            {
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new APIResponce
+                    {
+                        StatusCode = StatusCodes.Status500InternalServerError,
+                        Message = ["Failed to save OTP. Please try again."]
+                    });
+            }
 
             await _accountService.sendEmailAsync(
                 EmailType.ForgetPassword,
                 user,
-                $"Your OTP is: {otp}. Please do not share it with anyone.");
+                $"Your OTP is: {otp}. " +
+                "It expires in 10 minutes. Please do not share it.");
 
             return Ok(new APIResponce
             {
                 StatusCode = StatusCodes.Status200OK,
-                Message = ["OTP has been sent successfully."]
+                Message = ["OTP has been sent successfully."],
+                Data = new
+                {
+                    ApplicationUserId = user.Id
+                }
             });
         }
 
+
+
         [HttpPost("Validate-OTP")]
-        public async Task<IActionResult> ValidateOTP(ValidateOTPRequest validateOTPRequest)
+        public async Task<IActionResult> ValidateOTP(
+            ValidateOTPRequest validateOTPRequest)
         {
-
-            var user = await _userManager.FindByIdAsync(validateOTPRequest.ApplicationUserId);
-            if (user is null) return NotFound();
-
-            var otp = (await _applicationUserOTPRepository.GetAsync()).Where(e => e.IsValid && e.ApplicationUser.Id == user.Id)
-                .OrderBy(e => e.Id).LastOrDefault();
-            if (otp is null || otp.OTP != validateOTPRequest.OTP)
-            {
-                return BadRequest(new APIResponce
-                {
-                    Message = ["Invalid OTP , Please Try Again !"]
-                });
-            }
-            else
-            {
-                otp.IsUsed = true;
-                _applicationUserOTPRepository.Update(otp);
-                await _applicationUserOTPRepository.CommitAsync();
-                return Ok(new APIResponce
-                {
-                    Message = ["OTP verified successfully"],
-
-                });
-            }
-
-        }
-
-
-
-
-        [HttpPost("Reset-Password")]
-        public async Task<IActionResult> ResetPassword(ResetPasswordRequest resetPasswordRequest)
-        {
-            var user = await _userManager.FindByIdAsync(resetPasswordRequest.ApplicationUserId);
+            var user = await _userManager.FindByIdAsync(
+                validateOTPRequest.ApplicationUserId);
 
             if (user is null)
             {
@@ -346,11 +381,103 @@ namespace CodegateTest.Areas.Identity
                 });
             }
 
-            var userToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            // جلب أكواد هذا المستخدم فقط دون الاعتماد على navigation property.
+            var userOtps = await _applicationUserOTPRepository.GetAsync(
+                e => e.ApplicationUserId == user.Id);
+
+            // التحقق من آخر كود صدر، وعدم الرجوع لكود أقدم.
+            var otp = userOtps
+                .OrderByDescending(e => e.Id)
+                .FirstOrDefault();
+
+            if (otp is null ||
+                otp.IsUsed ||
+                otp.ExpiredAt <= DateTime.UtcNow ||
+                otp.FailedAttempts >= 5)
+            {
+                return BadRequest(new APIResponce
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = ["Invalid or expired OTP."]
+                });
+            }
+
+            if (otp.OTP != validateOTPRequest.OTP)
+            {
+                otp.FailedAttempts++;
+                if (otp.FailedAttempts >= 5)
+                {
+                    otp.IsUsed = true;
+                }
+                _applicationUserOTPRepository.Update(otp);
+                if (await _applicationUserOTPRepository.CommitAsync() <= 0)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, new APIResponce
+                    {
+                        StatusCode = StatusCodes.Status500InternalServerError,
+                        Message = ["Failed to verify OTP. Please try again later."]
+                    });
+                }
+                return BadRequest(new APIResponce
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = otp.IsUsed
+                        ? ["Maximum OTP verification attempts reached. Please request a new OTP."]
+                        : ["Invalid or expired OTP."]
+                });
+            }
+
+            var resetToken =
+                await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            otp.IsUsed = true;
+            _applicationUserOTPRepository.Update(otp);
+
+            var saved = await _applicationUserOTPRepository.CommitAsync();
+
+            if (saved <= 0)
+            {
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new APIResponce
+                    {
+                        StatusCode = StatusCodes.Status500InternalServerError,
+                        Message = ["Failed to verify OTP. Please try again."]
+                    });
+            }
+
+            return Ok(new APIResponce
+            {
+                StatusCode = StatusCodes.Status200OK,
+                Message = ["OTP verified successfully."],
+                Data = new
+                {
+                    ApplicationUserId = user.Id,
+                    ResetToken = resetToken
+                }
+            });
+        }
+
+
+        [HttpPost("Reset-Password")]
+        public async Task<IActionResult> ResetPassword(
+     ResetPasswordRequest resetPasswordRequest)
+        {
+            var user = await _userManager.FindByIdAsync(
+                resetPasswordRequest.ApplicationUserId);
+
+            if (user is null)
+            {
+                return NotFound(new APIResponce
+                {
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Message = ["User not found."]
+                });
+            }
 
             var result = await _userManager.ResetPasswordAsync(
                 user,
-                userToken,
+                resetPasswordRequest.ResetToken,
                 resetPasswordRequest.Password);
 
             if (!result.Succeeded)
@@ -358,7 +485,9 @@ namespace CodegateTest.Areas.Identity
                 return BadRequest(new APIResponce
                 {
                     StatusCode = StatusCodes.Status400BadRequest,
-
+                    Message = result.Errors
+                        .Select(error => error.Description)
+                        .ToArray()
                 });
             }
 

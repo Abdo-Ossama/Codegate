@@ -16,7 +16,9 @@ namespace CodegateTest.DTOs.Requests
         public string Slug { get; set; } = null!;
 
         [Required(ErrorMessage = "Price is required.")]
-        [Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than 0.")]
+        [Range(typeof(decimal), "0.01", "79228162514264337593543950335",
+            ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true,
+            ErrorMessage = "Price must be at least 0.01.")]
         public decimal Price { get; set; }
 
         public string? Description { get; set; }

@@ -1,5 +1,6 @@
 ﻿using CodegateTest.Repositories.IRepositories;
 using Microsoft.AspNetCore.Authorization;
+using CodegateTest.Services.IServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,7 @@ namespace CodegateTest.Areas.Admin
         private readonly IRepository<Course> _courseRepository;
         private readonly IRepository<Instructor> _instructorRepository;
         private readonly IRepository<Contact>  _contactRepository;
+        private readonly IImageService _imageService;
 
 
 
@@ -26,12 +28,14 @@ namespace CodegateTest.Areas.Admin
         public DashboardController(UserManager<ApplicationUser> userManager, 
             IRepository<Course> courseRepository,
             IRepository<Instructor> instructorRepository,
-            IRepository<Contact> contactRepository)
+            IRepository<Contact> contactRepository,
+            IImageService imageService)
         {
             _courseRepository = courseRepository;
             _instructorRepository = instructorRepository;
             _userManager = userManager;
             _contactRepository = contactRepository;
+            _imageService = imageService;
         }
 
         [HttpGet]
@@ -51,6 +55,19 @@ namespace CodegateTest.Areas.Admin
       .GetAsync(e => !e.IsDeleted))
       .OrderByDescending(e => e.CreatedAt)
       .Take(3)
+      .Select(course => new
+      {
+          course.Id,
+          course.Name,
+          course.Slug,
+          course.Price,
+          course.Description,
+          course.IsActive,
+          course.IsDeleted,
+          course.CreatedAt,
+          CoverImageUrl = _imageService.GetImageUrl(course.CoverImageUrl, "courses_img"),
+          course.CourseInstructors
+      })
       .ToList();
 
             var lastUsers = await _userManager.Users

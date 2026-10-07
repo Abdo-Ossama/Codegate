@@ -1,9 +1,15 @@
-﻿namespace CodegateTest.DTOs.Requests
+using System.ComponentModel.DataAnnotations;
+
+namespace CodegateTest.DTOs.Requests
 {
     public class UpdateProfileRequest
     {
-        public string? Fname { get; set; } = string.Empty;
-        public string ?Lname { get; set; } = string.Empty;
+        [StringLength(50, MinimumLength = 2)]
+        [RegularExpression(@"^[\s\S]*\S[\s\S]*$", ErrorMessage = "First name cannot contain only whitespace.")]
+        public string? Fname { get; set; }
+        [StringLength(50, MinimumLength = 2)]
+        [RegularExpression(@"^[\s\S]*\S[\s\S]*$", ErrorMessage = "Last name cannot contain only whitespace.")]
+        public string? Lname { get; set; }
         public IFormFile? ProfileImage { get; set; }
     }
 }

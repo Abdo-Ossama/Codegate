@@ -1,4 +1,3 @@
-﻿using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -28,6 +27,16 @@ namespace CodegateTest.Areas.Admin
         {
             var users = _userManager.Users.AsNoTracking();
 
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                users = users.Where(user =>
+                    (user.UserName != null && user.UserName.Contains(term)) ||
+                    (user.Email != null && user.Email.Contains(term)) ||
+                    user.Fname.Contains(term) ||
+                    user.Lname.Contains(term));
+            }
+
             var totalUsers = await users.CountAsync();
 
             if (page <= 1)
@@ -39,6 +48,8 @@ namespace CodegateTest.Areas.Admin
             var totalPages = (int)Math.Ceiling(totalUsers / (double)pageSize);
 
             var finalUsers = await users
+                .OrderByDescending(user => user.CreatedAt)
+                .ThenBy(user => user.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -78,8 +89,9 @@ namespace CodegateTest.Areas.Admin
             var user = await _userManager.FindByIdAsync(id);
             if (user is null)
             {
-                return BadRequest(new APIResponce()
+                return NotFound(new APIResponce()
                 {
+                    StatusCode = 404,
                     Message = ["User is not Found"]
                 });
             }
@@ -97,10 +109,14 @@ namespace CodegateTest.Areas.Admin
         [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Create(CreateUserRequest createUserRequest)
         {
-            var user = createUserRequest.Adapt<ApplicationUser>();
-
-            user.UserName = createUserRequest.Email;
-            user.EmailConfirmed = true;
+            var user = new ApplicationUser
+            {
+                Fname = createUserRequest.FirstName,
+                Lname = createUserRequest.LastName,
+                Email = createUserRequest.Email,
+                UserName = createUserRequest.UserName,
+                EmailConfirmed = true
+            };
 
             var result = await _userManager.CreateAsync(
                 user,
@@ -111,6 +127,7 @@ namespace CodegateTest.Areas.Admin
             {
                 return BadRequest(new APIResponce
                 {
+                    StatusCode = 400,
                     Message = ["Failed to create user"]
 
                 });
@@ -125,13 +142,15 @@ namespace CodegateTest.Areas.Admin
             {
                 return BadRequest(new APIResponce
                 {
+                    StatusCode = 400,
                     Message = ["Failed to add role to the user"]
 
                 });
             }
 
-            return Ok(new
+            return StatusCode(StatusCodes.Status201Created, new
             {
+                StatusCode = StatusCodes.Status201Created,
                 Message = "User created successfully",
                 UserId = user.Id
             });
@@ -150,39 +169,46 @@ namespace CodegateTest.Areas.Admin
 
             if (user is null)
             {
-                return BadRequest(new APIResponce()
+                return NotFound(new APIResponce()
                 {
+                    StatusCode = 404,
                     Message = ["User is not Found"]
                 });
             }
 
-            user.Fname = updateUserRequest.FirstName;
-            user.Lname = updateUserRequest.LastName;
+            user.Fname = updateUserRequest.FirstName ?? user.Fname;
+            user.Lname = updateUserRequest.LastName ?? user.Lname;
 
-            var usernameResult = await _userManager.SetUserNameAsync(
-                user,
-                updateUserRequest.Email
-            );
-
-            if (!usernameResult.Succeeded)
+            if (updateUserRequest.UserName is not null &&
+                updateUserRequest.UserName != user.UserName)
             {
-                return BadRequest(new APIResponce()
+                var usernameResult = await _userManager.SetUserNameAsync(
+                    user, updateUserRequest.UserName);
+
+                if (!usernameResult.Succeeded)
                 {
-                    Message = ["Failed to update username"]
-                });
+                    return BadRequest(new APIResponce
+                    {
+                        StatusCode = 400,
+                        Message = usernameResult.Errors.Select(error => error.Description).ToArray()
+                    });
+                }
             }
 
-            var emailResult = await _userManager.SetEmailAsync(
-                user,
-                updateUserRequest.Email
-            );
-
-            if (!emailResult.Succeeded)
+            if (updateUserRequest.Email is not null &&
+                !string.Equals(updateUserRequest.Email, user.Email, StringComparison.OrdinalIgnoreCase))
             {
-                return BadRequest(new APIResponce()
+                var emailResult = await _userManager.SetEmailAsync(
+                    user, updateUserRequest.Email);
+
+                if (!emailResult.Succeeded)
                 {
-                    Message = ["Failed to update email"]
-                });
+                    return BadRequest(new APIResponce
+                    {
+                        StatusCode = 400,
+                        Message = emailResult.Errors.Select(error => error.Description).ToArray()
+                    });
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(updateUserRequest.Password))
@@ -199,6 +225,7 @@ namespace CodegateTest.Areas.Admin
                 {
                     return BadRequest(new APIResponce()
                     {
+                        StatusCode = 400,
                         Message = ["Failed to update password"]
                     });
                 }
@@ -217,6 +244,7 @@ namespace CodegateTest.Areas.Admin
                     {
                         return BadRequest(new APIResponce()
                         {
+                            StatusCode = 400,
                             Message = ["Failed to remove old role"]
                         });
                     }
@@ -231,9 +259,20 @@ namespace CodegateTest.Areas.Admin
                 {
                     return BadRequest(new APIResponce()
                     {
+                        StatusCode = 400,
                         Message = ["Failed to add new role"]
                     });
                 }
+            }
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return BadRequest(new APIResponce
+                {
+                    StatusCode = 400,
+                    Message = updateResult.Errors.Select(error => error.Description).ToArray()
+                });
             }
 
             return Ok(new
@@ -253,8 +292,9 @@ namespace CodegateTest.Areas.Admin
 
             if (user is null)
             {
-                return BadRequest(new APIResponce()
+                return NotFound(new APIResponce()
                 {
+                    StatusCode = 404,
                     Message = ["User is not Found"]
                 });
             }
@@ -272,6 +312,7 @@ namespace CodegateTest.Areas.Admin
                 {
                     return BadRequest(new APIResponce()
                     {
+                        StatusCode = 400,
                         Message = ["Failed to activate user"]
                     });
                 }
@@ -293,6 +334,7 @@ namespace CodegateTest.Areas.Admin
             {
                 return BadRequest(new APIResponce()
                 {
+                    StatusCode = 400,
                     Message = ["Failed to lock user"]
                 });
             }
@@ -313,8 +355,9 @@ namespace CodegateTest.Areas.Admin
 
             if (user is null)
             {
-                return BadRequest(new APIResponce()
+                return NotFound(new APIResponce()
                 {
+                    StatusCode = 404,
                     Message = ["User is not Found"]
                 });
             }
@@ -325,6 +368,7 @@ namespace CodegateTest.Areas.Admin
             {
                 return BadRequest(new APIResponce()
                 {
+                    StatusCode = 400,
                     Message = ["Failed to delete user"]
                 });
             }

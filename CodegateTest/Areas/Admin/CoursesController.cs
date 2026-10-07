@@ -1,4 +1,4 @@
-﻿using CodegateTest.Repositories.IRepositories;
+using CodegateTest.Repositories.IRepositories;
 using CodegateTest.Services;
 using CodegateTest.Services.IServices;
 using Mapster;
@@ -53,8 +53,10 @@ namespace CodegateTest.Areas.Admin
             var totalPages = (int)Math.Ceiling(totalCourses / (double)pageSize);
 
             var cousreQuery = courses
-     .Skip((page - 1) * pageSize)
-     .Take(pageSize);
+                .OrderByDescending(course => course.CreatedAt)
+                .ThenBy(course => course.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize);
 
 
             return Ok(new CoursesResponce()
@@ -67,9 +69,10 @@ namespace CodegateTest.Areas.Admin
                     e.Price,
                     e.Description,
                     e.IsActive,
-                    e.CoverImageUrl,
+                    CoverImageUrl = _imageService.GetImageUrl(e.CoverImageUrl, "courses_img"),
 
                     Instructors = e.CourseInstructors
+            .Where(link => !link.Instructor.IsDeleted)
             .Select(e =>
                 $"{e.Instructor.FirstName} {e.Instructor.LastName}")
             .ToList()
@@ -90,21 +93,21 @@ namespace CodegateTest.Areas.Admin
         public async Task<IActionResult> Get(int id)
         {
             var course = await _courseRepository.GetOneAsync(
-                e => e.Id == id
+                e => e.Id == id && !e.IsDeleted
             );
 
             if (course is null)
             {
-                return BadRequest(new APIResponce
+                return NotFound(new APIResponce
                 {
-                    StatusCode = 400,
+                    StatusCode = 404,
                     Message = ["Course Not Found"]
                 });
             }
 
             var courseInstructors =
                 await _courseInstractorRepository.GetAsync(
-                    e => e.CourseId == id,
+                    e => e.CourseId == id && !e.Instructor.IsDeleted,
                     includes: [e => e.Instructor]
                 );
 
@@ -118,13 +121,13 @@ namespace CodegateTest.Areas.Admin
                     course.Price,
                     course.Description,
                     course.IsActive,
-                    course.CoverImageUrl,
+                    CoverImageUrl = _imageService.GetImageUrl(course.CoverImageUrl, "courses_img"),
 
                     Instructors = courseInstructors
     .Select(e => new
     {
         Name = $"{e.Instructor.FirstName} {e.Instructor.LastName}",
-        AvatarUrl = e.Instructor.AvatarUrl
+        AvatarUrl = _imageService.GetImageUrl(e.Instructor.AvatarUrl, "instructors_img")
     })
     .ToList()
 
@@ -137,30 +140,59 @@ namespace CodegateTest.Areas.Admin
         public async Task<IActionResult> CreateCourse(
     [FromForm] CreateCourseRequest createCourseRequest)
         {
-            var course = new Course
+            var instructorError = await ValidateInstructorIdsAsync(createCourseRequest.InstructorIds);
+            if (instructorError is not null)
             {
-                Name = createCourseRequest.Name,
-                Slug = createCourseRequest.Slug,
-                Price = createCourseRequest.Price,
-                Description = createCourseRequest.Description,
-                CoverImageUrl = await _imageService.UploadImageAsync(
-                    createCourseRequest.CoverImage,
-                    "courses_img"
-                ),
-                CourseInstructors = createCourseRequest.InstructorIds
-                    .Select(id => new CourseInstructors
-                    {
-                        InstructorId = id
-                    })
-                    .ToList()
-            };
+                return BadRequest(new APIResponce
+                {
+                    StatusCode = 400,
+                    Message = [instructorError]
+                });
+            }
 
-            await _courseRepository.CreateAsync(course);
-            await _courseRepository.CommitAsync();
-
-            return Ok(new APIResponce
+            string image;
+            try
             {
-                StatusCode = 200,
+                image = await _imageService.UploadImageAsync(createCourseRequest.CoverImage, "courses_img");
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(new APIResponce { StatusCode = 400, Message = [exception.Message] });
+            }
+
+            try
+            {
+                var course = new Course
+                {
+                    Name = createCourseRequest.Name,
+                    Slug = createCourseRequest.Slug,
+                    Price = createCourseRequest.Price,
+                    Description = createCourseRequest.Description,
+                    CoverImageUrl = image,
+                    CourseInstructors = createCourseRequest.InstructorIds
+                        .Select(id => new CourseInstructors
+                        {
+                            InstructorId = id
+                        })
+                        .ToList()
+                };
+
+                await _courseRepository.CreateAsync(course);
+                if (await _courseRepository.CommitAsync() <= 0)
+                {
+                    _imageService.DeleteImage(image, "courses_img");
+                    return SaveImageFailure();
+                }
+            }
+            catch
+            {
+                _imageService.DeleteImage(image, "courses_img");
+                throw;
+            }
+
+            return StatusCode(StatusCodes.Status201Created, new APIResponce
+            {
+                StatusCode = 201,
                 Message = ["Course Created Successfully"]
             });
         }
@@ -173,7 +205,7 @@ namespace CodegateTest.Areas.Admin
       [FromForm] CourseUpdateRequest courseUpdateRequest)
         {
             var courseInDb = await _courseRepository.GetOneAsync(
-                e => e.Id == id,
+                e => e.Id == id && !e.IsDeleted,
                 includes: [e => e.CourseInstructors]
             );
 
@@ -186,58 +218,96 @@ namespace CodegateTest.Areas.Admin
                 });
             }
 
-            // Update Course Image
-            if (courseUpdateRequest.CoverImg is not null)
-            {
-
-                if (!string.IsNullOrEmpty(courseInDb.CoverImageUrl))
-                {
-                    _imageService.DeleteImage(
-                        courseInDb.CoverImageUrl,
-                        "courses_img"
-                    );
-                }
-
-                courseInDb.CoverImageUrl = await _imageService.UploadImageAsync(
-                    courseUpdateRequest.CoverImg,
-                    "courses_img"
-                );
-            }
-
-            // Update Course Data
-            courseInDb.Name =
-                courseUpdateRequest.Name ?? courseInDb.Name;
-
-            courseInDb.Slug =
-                courseUpdateRequest.Slug ?? courseInDb.Slug;
-
-            courseInDb.Price =
-                courseUpdateRequest.Price ?? courseInDb.Price;
-
-            courseInDb.Description =
-                courseUpdateRequest.Description ?? courseInDb.Description;
-
-            courseInDb.IsActive =
-                courseUpdateRequest.IsActive ?? courseInDb.IsActive;
-
-            // Update Instructors
             if (courseUpdateRequest.InstructorIds is not null)
             {
-                courseInDb.CourseInstructors.Clear();
-
-                foreach (var instructorId in courseUpdateRequest.InstructorIds)
+                var instructorError = await ValidateInstructorIdsAsync(courseUpdateRequest.InstructorIds);
+                if (instructorError is not null)
                 {
-                    courseInDb.CourseInstructors.Add(new CourseInstructors
+                    return BadRequest(new APIResponce
                     {
-                        CourseId = courseInDb.Id,
-                        InstructorId = instructorId
+                        StatusCode = 400,
+                        Message = [instructorError]
                     });
                 }
             }
 
-            _courseRepository.Update(courseInDb);
+            var oldImage = courseInDb.CoverImageUrl;
+            string? newImage = null;
 
-            await _courseRepository.CommitAsync();
+            if (courseUpdateRequest.CoverImg is not null)
+            {
+                try
+                {
+                    newImage = await _imageService.UploadImageAsync(courseUpdateRequest.CoverImg, "courses_img");
+                    courseInDb.CoverImageUrl = newImage;
+                }
+                catch (ArgumentException exception)
+                {
+                    return BadRequest(new APIResponce { StatusCode = 400, Message = [exception.Message] });
+                }
+            }
+
+            try
+            {
+                // Update Course Data
+                courseInDb.Name =
+                    courseUpdateRequest.Name ?? courseInDb.Name;
+
+                courseInDb.Slug =
+                    courseUpdateRequest.Slug ?? courseInDb.Slug;
+
+                courseInDb.Price =
+                    courseUpdateRequest.Price ?? courseInDb.Price;
+
+                courseInDb.Description =
+                    courseUpdateRequest.Description ?? courseInDb.Description;
+
+                courseInDb.IsActive =
+                    courseUpdateRequest.IsActive ?? courseInDb.IsActive;
+
+                // Update Instructors
+                if (courseUpdateRequest.InstructorIds is not null)
+                {
+                    var requestedIds = courseUpdateRequest.InstructorIds.ToHashSet();
+                    foreach (var link in courseInDb.CourseInstructors
+                        .Where(link => !requestedIds.Contains(link.InstructorId)).ToList())
+                    {
+                        _courseInstractorRepository.Delete(link);
+                        courseInDb.CourseInstructors.Remove(link);
+                    }
+
+                    var existingIds = courseInDb.CourseInstructors
+                        .Select(link => link.InstructorId).ToHashSet();
+                    foreach (var instructorId in requestedIds.Except(existingIds))
+                    {
+                        var link = new CourseInstructors
+                        {
+                            CourseId = courseInDb.Id,
+                            InstructorId = instructorId
+                        };
+                        courseInDb.CourseInstructors.Add(link);
+                        await _courseInstractorRepository.CreateAsync(link);
+                    }
+                }
+
+                _courseRepository.Update(courseInDb);
+
+                var saved = await _courseRepository.CommitAsync();
+                if (newImage is not null && saved <= 0)
+                {
+                    _imageService.DeleteImage(newImage, "courses_img");
+                    return SaveImageFailure();
+                }
+            }
+            catch
+            {
+                if (newImage is not null)
+                    _imageService.DeleteImage(newImage, "courses_img");
+                throw;
+            }
+
+            if (newImage is not null && !string.IsNullOrEmpty(oldImage))
+                _imageService.DeleteImage(oldImage, "courses_img");
 
             return Ok(new APIResponce
             {
@@ -246,12 +316,35 @@ namespace CodegateTest.Areas.Admin
             });
         }
 
+        private async Task<string?> ValidateInstructorIdsAsync(List<int>? instructorIds)
+        {
+            if (instructorIds is null || instructorIds.Count == 0)
+                return "At least one instructor is required.";
+            if (instructorIds.Any(id => id <= 0))
+                return "Instructor IDs must be positive.";
+            if (instructorIds.Distinct().Count() != instructorIds.Count)
+                return "Duplicate instructor IDs are not allowed.";
+
+            var instructors = await _instructorRepository.GetAsync(
+                instructor => instructorIds.Contains(instructor.Id) && !instructor.IsDeleted,
+                tracked: false);
+            return instructors.Count() == instructorIds.Count
+                ? null
+                : "One or more instructors do not exist or have been deleted.";
+        }
+
+        private IActionResult SaveImageFailure() => StatusCode(500, new APIResponce
+        {
+            StatusCode = 500,
+            Message = ["Failed to save the course. The previous image has been kept."]
+        });
+
         [HttpDelete("{id}")]
         [Authorize(Roles = SD.ADMIN_ROLE)]
         public async Task<IActionResult> Delete(int id)
         {
             var course = await _courseRepository.GetOneAsync(
-                e => e.Id == id
+                e => e.Id == id && !e.IsDeleted
             );
 
             if (course is null)

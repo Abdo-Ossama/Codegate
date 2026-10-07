@@ -1,4 +1,4 @@
-﻿using CodegateTest.Models.CodegateTest.Models;
+using CodegateTest.Models.CodegateTest.Models;
 using CodegateTest.Repositories.IRepositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
