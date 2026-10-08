@@ -108,6 +108,7 @@ builder.Services.AddAuthentication(options =>
 
 
 // Services
+builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IJWTHandler, JWTHandler>();
 builder.Services.AddScoped<IRepository<ApplicationUserOTP>, Repository<ApplicationUserOTP>>();

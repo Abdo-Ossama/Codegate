@@ -26,8 +26,8 @@ namespace CodegateTest.Utilites.DbIntialiaion
                 }
             }
 
-            const string adminEmail = "abdoosama01095160180@gmail.com";
-            const string adminUserName = "abdo.Osama";
+            const string adminEmail = "codegate@gmail.com";
+            const string adminUserName = "code.gate";
 
 
             var admin = await _userManager.FindByEmailAsync(adminEmail);
@@ -36,8 +36,8 @@ namespace CodegateTest.Utilites.DbIntialiaion
             {
                 admin = new ApplicationUser
                 {
-                    Fname = "abdo",
-                    Lname = "osama",
+                    Fname = "code",
+                    Lname = "gate",
                     Email = adminEmail,
                     UserName = adminUserName,
                     EmailConfirmed = true

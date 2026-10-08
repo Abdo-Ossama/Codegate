@@ -19,7 +19,6 @@ namespace CodegateTest.DTOs.Requests
         
         public IFormFile? CoverImg { get; set; }
 
-        [MinLength(1)]
         public List<int>? InstructorIds { get; set; }
     }
 }

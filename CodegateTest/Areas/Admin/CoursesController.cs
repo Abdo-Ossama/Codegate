@@ -9,9 +9,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CodegateTest.Areas.Admin
 {
-    [Route("api/[area]/[controller]")]
+    [Route("api/[controller]")]
     [ApiController]
-    [Area(SD.ADMIN_AREA)]
+
     public class CoursesController : ControllerBase
     {
         private readonly IRepository<Course> _courseRepository;

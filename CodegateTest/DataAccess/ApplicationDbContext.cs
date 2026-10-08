@@ -58,7 +58,9 @@ namespace CodegateTest.DataAccess
                     e.CourseId
                 })
                 .IsUnique();
+
         }
+
 
     }
 }
